@@ -2,6 +2,8 @@ from transformers import AutoTokenizer
 import transformers
 import torch
 
+from prompts.code_prompt import code_prompt
+
 class CodeLLamaModel():
     def __init__(self, model_path: str):
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)

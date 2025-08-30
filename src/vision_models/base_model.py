@@ -9,3 +9,6 @@ class BaseModel(abc.ABC):
     @abc.abstractmethod
     def forward(self, *args, **kwargs):
         pass
+
+    def load_model(self):
+        pass

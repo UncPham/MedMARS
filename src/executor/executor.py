@@ -3,7 +3,7 @@ import builtins
 import time
 from typing import Any, Dict
 
-class SafeExecutor:
+class Executor:
     ALLOWED_BUILTINS = {
         "range", "len", "min", "max", "sum", "sorted", "enumerate", "any", "all",
         "float", "int", "str", "list", "dict", "set", "tuple", "abs", "zip", "print"
@@ -18,7 +18,6 @@ class SafeExecutor:
         ast.Attribute, ast.Name, ast.Constant, ast.Return,
         ast.comprehension, ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp,
         ast.With, ast.IfExp, ast.Pass, ast.JoinedStr, ast.FormattedValue,
-        ast.keyword,  # Allow keyword arguments in function calls
         # Comparison operators
         ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.Is, ast.IsNot, ast.In, ast.NotIn,
         # Binary operators
@@ -61,7 +60,4 @@ class SafeExecutor:
         locals_env: Dict[str, Any] = {}
         exec(compile(tree, filename="<plan>", mode="exec"), globals_env, locals_env)
         _check_time()
-
-        if "FINAL_ANSWER" not in locals_env:
-            raise RuntimeError("Planner code did not set FINAL_ANSWER")
-        return locals_env["FINAL_ANSWER"]
+        return
