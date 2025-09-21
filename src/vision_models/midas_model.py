@@ -13,11 +13,11 @@ from src.vision_models.base_model import BaseModel
 
 
 class MiDaSModel(BaseModel):
-    def __init__(self, model_name="Intel/dpt-large"):
+    def __init__(self, model_name="Intel/dpt-hybrid-midas"):
         super().__init__()
         self.load_model(model_name)
 
-    def load_model(self, model_name="Intel/dpt-large"):
+    def load_model(self, model_name="Intel/dpt-hybrid-midas"):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.processor = DPTImageProcessor.from_pretrained(model_name)
         self.model = DPTForDepthEstimation.from_pretrained(model_name).to(self.device)

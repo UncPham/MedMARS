@@ -11,7 +11,7 @@ from base_model import BaseModel
 
 
 class GroundingDINOModel(BaseModel):
-    def __init__(self, model_path: str = "IDEA-Research/grounding-dino-tiny"):
+    def __init__(self, model_path: str = "IDEA-Research/grounding-dino-base"):
         super().__init__()
         self.load_model(model_path)
 
@@ -19,7 +19,7 @@ class GroundingDINOModel(BaseModel):
         self.processor = AutoProcessor.from_pretrained(model_path)
         self.model = AutoModelForZeroShotObjectDetection.from_pretrained(model_path).to(self.device)
 
-    def forward(self, image_path: str, text_labels: str, threshold: float):
+    def __call__(self, image_path: str, text_labels: str, threshold: float):
         img = Image.open(image_path)
 
         inputs = self.processor(images=img, text=text_labels, return_tensors="pt").to(self.device)
@@ -29,7 +29,7 @@ class GroundingDINOModel(BaseModel):
 
         results = self.processor.post_process_grounded_object_detection(
             outputs,
-            inputs.input_ids,
+            inputs.input_ids, 
             threshold=threshold,
             target_sizes=[img.size[::-1]]
         )
@@ -39,7 +39,7 @@ class GroundingDINOModel(BaseModel):
 
 if __name__ == "__main__":
     model = GroundingDINOModel()
-    result = model.forward("/Users/uncpham/Repo/Medical-Assistant/src/static/anh_meo_hai_huoc1.jpg", [["a cat"]], 0.4)
+    result = model("/Users/uncpham/Repo/Medical-Assistant/src/static/anh_meo_hai_huoc1.jpg", [["a cat", "dog"]], 0.4)
     img = Image.open("/Users/uncpham/Repo/Medical-Assistant/src/static/anh_meo_hai_huoc1.jpg")
     draw = ImageDraw.Draw(img)
     for box, score, labels in zip(result["boxes"], result["scores"], result["labels"]):

@@ -8,8 +8,8 @@ from prompts.planner_prompt import planer_prompt
 class GeminiModel:
     def __init__(self):
         self.client = genai.Client(api_key=GEMINI_API_KEY)
-    
-    def run(self, query: str):
+
+    async def __call__(self, query: str):
         contents = [
             types.Content(
                 role="model", 

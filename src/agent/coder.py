@@ -8,7 +8,7 @@ class CodeModel:
     def __init__(self):
         self.client = genai.Client(api_key=GEMINI_API_KEY)
     
-    def run(self, query: str, image_path: str):
+    async def __call__(self, query: str, image_path: str):
         contents = [
             types.Content(
                 role="model", 
