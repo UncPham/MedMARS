@@ -35,7 +35,7 @@ class MedSAMModel(BaseModel):
         return probs
 
     @staticmethod
-    def show_mask(mask, ax, random_color):
+    def show_mask(mask, ax, random_color: bool = False):
         if random_color:
             color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
         else:

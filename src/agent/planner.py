@@ -5,7 +5,7 @@ from constants.env import GEMINI_API_KEY
 from prompts.planner_prompt import planer_prompt
 
 
-class GeminiModel:
+class PlannerModel:
     def __init__(self):
         self.client = genai.Client(api_key=GEMINI_API_KEY)
 

@@ -16,28 +16,15 @@ class BioMedClipModel(BaseModel):
         super().__init__()
         self.load_model()
 
-    def __call__(self, images_path: List[str], labels: List[str]):
-        """
-        This function uses the CLIP model to compute similarity between an image and text labels,
-        helping to find the most suitable label for the input image.
-
-        Input:
-        - image_path (str): Path to the image file to be processed.
-        - labels (List[str]): List of text labels to compare with the image.
-
-        Output:
-        - outputs (dict): Dictionary containing CLIP model results with the following keys:
-            - logits_per_image: Tensor of shape (1, num_labels) containing similarity scores between the image and each text label
-            - logits_per_text: Tensor of shape (num_labels, 1) containing similarity scores between each text label and the image
-            - text_embeds: Normalized embeddings for the text labels
-            - image_embeds: Normalized embeddings for the image
-        """
+    def __call__(self, images_path: List[str], labels: List[str]) -> dict:
         images = torch.stack(
             [self.preprocess(Image.open((img))) for img in images_path]
         ).to(self.device)
+
         texts = self.tokenizer(
             [l for l in labels], context_length=self.context_length
         ).to(self.device)
+        
         with torch.no_grad():
             image_features, text_features, logit_scale = self.model(images, texts)
 
@@ -46,23 +33,26 @@ class BioMedClipModel(BaseModel):
                 .detach()
                 .softmax(dim=-1)
             )
-            sorted_indices = torch.argsort(logits, dim=-1, descending=True)
 
+            sorted_indices = torch.argsort(logits, dim=-1, descending=True)
             logits = logits.cpu().numpy()
             sorted_indices = sorted_indices.cpu().numpy()
 
         top_k = -1
+        results = {}
 
-        for i, img in enumerate(image_path):
-            pred = labels[sorted_indices[i][0]]
-
+        for i, img in enumerate(images_path):
+            # Create dictionary for this image with label percentages
+            image_results = {}
             top_k = len(labels) if top_k == -1 else top_k
-            print(img.split("/")[-1] + ":")
             for j in range(top_k):
                 jth_index = sorted_indices[i][j]
-                print(f"{labels[jth_index]}: {logits[i][jth_index]}")
-            print("\n")
-        return
+                percentage = logits[i][jth_index] * 100  # Convert to percentage
+                image_results[labels[jth_index]] = round(percentage, 2)
+            
+            results[f"image_{img.split('/')[-1]}"] = image_results
+
+        return results
 
     def load_model(self):
         # Load the model and config files from the Hugging Face Hub
@@ -77,20 +67,21 @@ class BioMedClipModel(BaseModel):
         self.context_length = 256
 
 
-if __name__ == "__main__":
-    model = BioMedClipModel()
-    image_path = [
-        "/Users/uncpham/Repo/Medical-Assistant/src/data/vqa_rad/images/img_0.jpg"
-    ]
-    text = [
-        "adenocarcinoma histopathology",
-        "brain MRI",
-        "covid line chart",
-        "squamous cell carcinoma histopathology",
-        "immunohistochemistry histopathology",
-        "bone X-ray",
-        "chest X-ray",
-        "pie chart",
-        "hematoxylin and eosin histopathology",
-    ]
-    outputs = model(image_path, text)
+# if __name__ == "__main__":
+#     model = BioMedClipModel()
+#     image_path = [
+#         "/Users/uncpham/Repo/Medical-Assistant/src/data/vqa_rad/images/img_0.jpg"
+#     ]
+#     text = [
+#         "adenocarcinoma histopathology",
+#         "brain MRI",
+#         "covid line chart",
+#         "squamous cell carcinoma histopathology",
+#         "immunohistochemistry histopathology",
+#         "bone X-ray",
+#         "chest X-ray",
+#         "pie chart",
+#         "hematoxylin and eosin histopathology",
+#     ]
+#     outputs = model(image_path, text)
+#     print(outputs)

@@ -33,6 +33,7 @@ from src.vision_models.MedCLIP_SAM.segment_anything.segment_anything import (
     SamPredictor,
 )
 from src.vision_models.base_model import BaseModel
+from src.constants.env import SAM_CHECKPOINT
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -62,7 +63,7 @@ class MedCLIPSAMModel(BaseModel):
     def load_model(self):
         clip_version = "ViT-B/16"  # @param ["RN50x16", "RN50x4", "RN50", "RN101", "ViT-B/32", "ViT-B/16", "hila"]
         cam_version = "gScoreCAM"  # @param ['GradCAM', 'ScoreCAM', 'GracCAM++', 'AblationCAM', 'XGradCAM', 'EigenCAM', 'EigengradCAM', 'LayerCAM', 'HilaCAM', 'GroupCAM', 'SSCAM1', 'SSCAM2', 'RawCAM', 'GradientCAM', 'gScoreCAM']
-        self.sam_checkpoint = "/workspace/Medical-Assistant/src/vision_models/MedCLIP_SAM/segment_anything/sam_vit_h_4b8939.pth"  # @param {type:"string"}
+        self.sam_checkpoint = SAM_CHECKPOINT  # @param {type:"string"}
         self.model_type = "vit_h"  # @param ["vit_h", "vit_b","vit_l"] {type:"string"}
 
         topk_channels = 300  # @param {type:"slider", min:1, max:3072, step:1}
@@ -244,6 +245,6 @@ class MedCLIPSAMModel(BaseModel):
 
 if __name__ == "__main__":
     model = MedCLIPSAMModel()
-    image_path = "/workspace/Medical-Assistant/src/test/MedCLIP-SAM/assets/example.png"
+    image_path = "/Users/uncpham/Repo/Medical-Assistant/src/static/img_18.jpg"
     prompt = "brain tumor"
     model(image_path, prompt)

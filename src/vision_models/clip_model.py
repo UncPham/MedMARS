@@ -17,21 +17,6 @@ class ClipModel(BaseModel):
         self.load_model(model_path)
 
     def forward(self, image_path: str, labels: List[str]):
-        """
-        This function uses the CLIP model to compute similarity between an image and text labels,
-        helping to find the most suitable label for the input image.
-
-        Input:
-        - image_path (str): Path to the image file to be processed.
-        - labels (List[str]): List of text labels to compare with the image.
-
-        Output:
-        - outputs (dict): Dictionary containing CLIP model results with the following keys:
-            - logits_per_image: Tensor of shape (1, num_labels) containing similarity scores between the image and each text label
-            - logits_per_text: Tensor of shape (num_labels, 1) containing similarity scores between each text label and the image
-            - text_embeds: Normalized embeddings for the text labels
-            - image_embeds: Normalized embeddings for the image
-        """
         raw_image = Image.open(image_path).convert("RGB")
         # Use CLIP to find the most suitable patch
         inputs = self.clip_processor(

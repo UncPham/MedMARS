@@ -1,11 +1,11 @@
-from llm_models.gemini_model import GeminiModel
-from llm_models.code_model import CodeModel
+from agent.planner import PlannerModel
+from agent.coder import CoderModel
 from tools.tools import Tools
 from executor.executor import Executor
 
 if __name__ == "__main__":
-    planner = GeminiModel()
-    code_generator = CodeModel()
+    planner = PlannerModel()
+    code_generator = CoderModel()
 
     tools = Tools()
     executor = Executor(time_limit_s=60)

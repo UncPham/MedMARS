@@ -4,7 +4,7 @@ from google.genai import types
 from constants.env import GEMINI_API_KEY
 from prompts.code_prompt import code_prompt
 
-class CodeModel:
+class CoderModel:
     def __init__(self):
         self.client = genai.Client(api_key=GEMINI_API_KEY)
     
