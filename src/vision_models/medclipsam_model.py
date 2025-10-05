@@ -224,7 +224,7 @@ class MedCLIPSAMModel(BaseModel):
         mask = self.postprocess_crf(image_path, saliency_map)
 
         boxes, _ = self.scoremap2bbox(mask, 0, multi_contour_eval=False)
-point_coords
+
         self.predictor.set_image(img)
         boxes = np.array(boxes)
 
