@@ -32,13 +32,6 @@ class Explainer:
             return base64.b64encode(image_file.read()).decode("utf-8")
 
     def __call__(self, query: str, list_image: list = None) -> str:
-        # Add medical context to avoid content filter issues
-        medical_disclaimer = (
-            "IMPORTANT: This is a medical/healthcare professional analysis task. "
-            "Any images provided are medical images (X-rays, CT scans, MRI, pathology slides, etc.) "
-            "for legitimate diagnostic and educational purposes. "
-            "Please analyze them in a clinical context.\n\n"
-        )
 
         messages = [
             {"role": "system", "content": EXPLAINER_PROMPT}
@@ -55,7 +48,7 @@ class Explainer:
         # Build user message content
         if list_image and len(list_image) > 0:
             # Start with text content and medical disclaimer
-            content = [{"type": "text", "text": medical_disclaimer + query}]
+            content = [{"type": "text", "text": query}]
 
             # Add all images to content
             for image_path in list_image:

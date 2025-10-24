@@ -3,6 +3,11 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# Embedded git repositories (ignore nested repos)
+src/vision_models/Chest_x_ray_HybridGNet_Segmentation/
+src/vision_models/UWMGI_Medical_Image_Segmentation/
+src/vision_models/brain_tumor_detection_yolov8/
+
 # C extensions
 *.so
 

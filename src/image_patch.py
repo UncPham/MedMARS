@@ -6,19 +6,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from PIL import Image
 import numpy as np
 
-# from src.vision_models.groundingdino_model import GroundingDINOModel
 from src.vision_models.biomedclip_model import BioMedClipModel
-# from src.vision_models.midas_model import MiDaSModel
-# from src.vision_models.medclipsam_model import MedCLIPSAMModel
 from src.vision_models.medsam_model import MedSAMModel
-from src.vision_models.biomedparse_model import BiomedParseModel
 from src.vision_models.cxr_hybridgnet_segmentation_model import CXRHybridGNetSegmentationModel
 from src.agent.explainer import Explainer
 from src.vision_models.braintumordetection_model import BrainTumorDetectionModel
 from src.vision_models.uwmgi_segmentation_model import UWMGISegmentationModel
-
 from src.constants.env import STATIC_FOLDER
-from src.constants.constants import CHESTMNIST_LABEL, ORGANAMNIST_LABEL
+from src.constants.constants import CHESTMNIST_LABEL
 
 class ImagePatch:
     def __init__(self, outputs_dir: str = None):
@@ -29,10 +24,7 @@ class ImagePatch:
         os.makedirs(self.outputs_dir, exist_ok=True)
 
         # Initialize models
-        # self.groundingdino_model = GroundingDINOModel()
         self.biomedclip_model = BioMedClipModel()
-        # self.midas_model = MiDaSModel()
-        # self.biomedparse_model = BiomedParseModel()
         self.medsam_model = MedSAMModel(output_dir=self.outputs_dir)
         self.cxr_segmentation_model = CXRHybridGNetSegmentationModel(output_dir=self.outputs_dir)
         self.braintumordetection_model = BrainTumorDetectionModel(output_dir=self.outputs_dir)
@@ -102,7 +94,7 @@ class ImagePatch:
 if __name__ == "__main__":
     # Example usage
     model = ImagePatch()
-    sample_image_path = "/home/xuananh/work_1/chien/Medical-Assistant/src/data/vqa_rad/images/img_143.jpg"
+    sample_image_path = "/src/data/vqa_rad/images/img_143.jpg"
     result = model.detect_brain_tumor(sample_image_path)
     print(result)
 

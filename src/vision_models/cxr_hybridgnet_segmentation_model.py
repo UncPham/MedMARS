@@ -26,65 +26,60 @@ class CXRHybridGNetSegmentationModel(BaseModel):
 
     def __call__(self, image_path: str):
         """
-        Perform segmentation on a chest X-ray image and optionally save results.
+        Perform segmentation on a chest X-ray image and save results.
 
         Args:
             image_path: Path to the input chest X-ray image
 
         Returns:
-            dict: Dictionary containing:
-                - 'output_seg': The segmentation overlay (numpy array)
-                - 'saved_files': List of saved file paths (if output_dir is set)
-                - 'overlay_path': Path to the saved overlay image (if output_dir is set)
+            dict: Dictionary containing paths to saved images:
+                - 'overlay_path': Path to the segmentation overlay image
+                - 'RL_mask_path': Path to the right lung mask image
+                - 'LL_mask_path': Path to the left lung mask image
+                - 'H_mask_path': Path to the heart mask image
         """
-        # Perform segmentation - returns numpy arrays
-        seg_to_save, RL_mask, LL_mask, H_mask = segment(image_path)
+        # Perform segmentation - returns (outseg, file_list)
+        # The segment function saves files to tmp/ directory
+        outseg, file_list = segment(image_path)
 
+        # Create output directory if it doesn't exist
+        os.makedirs(self.output_dir, exist_ok=True)
+
+        # Get base filename from input image
+        base_filename = os.path.splitext(os.path.basename(image_path))[0]
+
+        # Get path to tmp directory
+        hybridgnet_dir = os.path.join(os.path.dirname(__file__), "Chest_x_ray_HybridGNet_Segmentation")
+        tmp_dir = os.path.join(hybridgnet_dir, "tmp")
+
+        # Copy files from tmp directory to output directory with new names
+        overlay_filename = f'{base_filename}_segmentation_lungs_heart_overlay.png'
+        overlay_path = os.path.join(self.output_dir, overlay_filename)
+        shutil.copy(os.path.join(tmp_dir, "overlap_segmentation.png"), overlay_path)
+
+        rl_mask_path = os.path.join(self.output_dir, f'{base_filename}_RL_mask.png')
+        ll_mask_path = os.path.join(self.output_dir, f'{base_filename}_LL_mask.png')
+        h_mask_path = os.path.join(self.output_dir, f'{base_filename}_H_mask.png')
+
+        shutil.copy(os.path.join(tmp_dir, "RL_mask.png"), rl_mask_path)
+        shutil.copy(os.path.join(tmp_dir, "LL_mask.png"), ll_mask_path)
+        shutil.copy(os.path.join(tmp_dir, "H_mask.png"), h_mask_path)
+
+        # Return only the paths
         result = {
-            
-            'overlay': {
-                'image': seg_to_save,
-                'path': ,
-            },
-            'RL_mask': RL_mask,
-            'LL_mask': LL_mask,
-            'H_mask': H_mask,
-            'saved_files': []
+            'overlay_path': overlay_path,
+            'RL_mask_path': rl_mask_path,
+            'LL_mask_path': ll_mask_path,
+            'H_mask_path': h_mask_path
         }
-
-        # Save results if output_dir is specified
-        if self.output_dir is not None:
-            # Create output directory if it doesn't exist
-            os.makedirs(self.output_dir, exist_ok=True)
-
-            # Get base filename from input image
-            base_filename = os.path.splitext(os.path.basename(image_path))[0]
-
-            # Save overlay image
-            overlay_filename = f'{base_filename}_segmentation_overlay.png'
-            overlay_path = os.path.join(self.output_dir, overlay_filename)
-            cv2.imwrite(overlay_path, cv2.cvtColor(seg_to_save, cv2.COLOR_RGB2BGR))
-            result['saved_files'].append(overlay_path)
-
-            # Save mask images
-            rl_mask_path = os.path.join(self.output_dir, f'{base_filename}_RL_mask.png')
-            ll_mask_path = os.path.join(self.output_dir, f'{base_filename}_LL_mask.png')
-            h_mask_path = os.path.join(self.output_dir, f'{base_filename}_H_mask.png')
-
-            cv2.imwrite(rl_mask_path, RL_mask)
-            cv2.imwrite(ll_mask_path, LL_mask)
-            cv2.imwrite(h_mask_path, H_mask)
-
-            result['saved_files'].extend([rl_mask_path, ll_mask_path, h_mask_path])
 
         return result
     
 if __name__ == "__main__":
     model = CXRHybridGNetSegmentationModel()
-    image_path = '/home/xuananh/work_1/chien/Medical-Assistant/src/data/vqa_rad/images/img_0.jpg'
+    image_path = '/Users/uncpham/Repo/Medical-Assistant/src/data/vqa_rad/images/img_0.jpg'
     result = model(image_path)
-    print(f"Segmentation overlay shape: {result['seg_overlay'].shape}")
-    print(f"Right lung mask shape: {result['RL_mask'].shape}")
-    print(f"Left lung mask shape: {result['LL_mask'].shape}")
-    print(f"Heart mask shape: {result['H_mask'].shape}")
-    print(f"Saved files: {result['saved_files']}")
+    print(f"Overlay path: {result['overlay_path']}")
+    print(f"Right lung mask path: {result['RL_mask_path']}")
+    print(f"Left lung mask path: {result['LL_mask_path']}")
+    print(f"Heart mask path: {result['H_mask_path']}")

@@ -12,6 +12,7 @@ import torchvision.transforms as TF
 
 from src.vision_models.UWMGI_Medical_Image_Segmentation.app import get_model, predict, Configs
 from src.vision_models.base_model import BaseModel
+from src.constants.env import STATIC_FOLDER
 
 
 class UWMGISegmentationModel(BaseModel):
@@ -26,7 +27,7 @@ class UWMGISegmentationModel(BaseModel):
     def __init__(self, output_dir: str = None):
         """Initialize the UWMGI Segmentation Model."""
         super().__init__()
-        self.output_dir = output_dir if output_
+        self.output_dir = output_dir if output_dir is not None else STATIC_FOLDER
 
         # Load model using existing function
         model_path = os.path.join(os.path.dirname(__file__),
@@ -125,7 +126,7 @@ if __name__ == "__main__":
     model = UWMGISegmentationModel()
 
     # Test with a sample image
-    test_image = "/home/xuananh/work_1/chien/Medical-Assistant/src/data/vqa_rad/images/img_25.jpg"
+    test_image = "/Users/uncpham/Repo/Medical-Assistant/src/data/vqa_rad/images/img_25.jpg"
 
     
     result = model(test_image, return_annotated=True, alpha=0.5)
