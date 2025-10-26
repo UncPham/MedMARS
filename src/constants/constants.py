@@ -1,0 +1,6 @@
+CHESTMNIST_LABEL = [
+       "atelectasis", "cardiomegaly", "effusion", "infiltration",
+       "mass", "nodule", "pneumonia", "pneumothorax",
+       "consolidation", "edema", "emphysema", "fibrosis",
+       "pleural", "hernia"
+   ]

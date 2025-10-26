@@ -1,30 +1,55 @@
-from google import genai
-from google.genai import types
+import os
+import sys
 
-from constants.env import GEMINI_API_KEY
-from prompts.code_prompt import code_prompt
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+
+from openai import AzureOpenAI
+
+from src.constants.env import (
+    AZURE_OPENAI_API_KEY,
+    AZURE_OPENAI_DEPLOYMENT,
+    AZURE_OPENAI_API_VERSION,
+    AZURE_OPENAI_ENDPOINT,
+)
+from src.prompts.code_prompt import CODER_PROMPT, EXAMPLES_CODER
+
 
 class CoderModel:
     def __init__(self):
-        self.client = genai.Client(api_key=GEMINI_API_KEY)
-    
-    async def __call__(self, query: str, image_path: str):
-        contents = [
-            types.Content(
-                role="model", 
-                parts=[types.Part(text=code_prompt)]
-            ),
-            types.Content(
-                role="user", 
-                parts=[types.Part(text=query)]
-            ),
-            types.Content(
-                role="user",
-                parts=[types.Part(text=image_path)]
-            )
-        ]
-        response = self.client.models.generate_content(
-            model="gemini-2.5-flash", 
-            contents=contents
+        self.client = AzureOpenAI(
+            api_key=AZURE_OPENAI_API_KEY,
+            azure_endpoint=AZURE_OPENAI_ENDPOINT,
+            api_version=AZURE_OPENAI_API_VERSION,
         )
-        return response.text
+        self.deployment_name = AZURE_OPENAI_DEPLOYMENT
+
+    def __call__(self, plan: str):
+        """
+        Generate code based on plan.
+
+        Args:
+            plan: The coding plan or task
+        Returns:
+            Generated code or explanation
+        """
+        # Format prompt with examples
+        formatted_prompt = CODER_PROMPT.format(example=EXAMPLES_CODER)
+
+        messages = [
+            {
+                "role": "system",
+                "content": formatted_prompt
+            },
+            {
+                "role": "user",
+                "content": plan
+            }
+        ]
+        
+        response = self.client.chat.completions.create(
+            model=AZURE_OPENAI_DEPLOYMENT,
+            messages=messages,
+            temperature=0.3,
+            max_tokens=2000
+        )
+        return response.choices[0].message.content

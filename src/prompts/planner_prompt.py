@@ -6,8 +6,6 @@ PLANNER_PROMPT = '''
 2. **Question Understanding**: Analyze the question carefully to determine what information is being asked
 3. **Informed Planning**: Create a logical, sequential plan that uses the appropriate models based on both the question AND what you observe in the image
 
-**Available Models:**
-
 **ImagePatch Methods:**
 
 ### Classification Methods
@@ -34,42 +32,42 @@ PLANNER_PROMPT = '''
 3. `segment_lungs_heart(image_path: str) → dict`
    - Segments lungs and heart in chest X-rays
    - Returns:
-     {
+     {{
        'overlay_path': path to overlay image,
        'RL_mask_path': right lung mask path,
        'LL_mask_path': left lung mask path,
        'H_mask_path': heart mask path
-     }
+     }}
    - Use for: anatomical segmentation of chest X-rays
 
 4. `detect_brain_tumor(image_path: str) → dict`
    - Detects and segments brain tumors in MRI/CT using YOLO detection + MedSAM segmentation
    - Returns:
-     {
+     {{
        'detection_path': str,  # Path to detection visualization image
        'detections': [         # List of detected tumors
-         {
+         {{
            'class': str,        # Detected class label
            'confidence': float, # Confidence score of detection
            'bbox': [x1, y1, x2, y2],  # Bounding box coordinates
-         }
+         }}
        ],
        'num_detections': int,  # Total number of tumors detected
        'segmentations': [      # List of segmentation results (one per detection)
-         {
+         {{
            'detection_index': int,        # Index of corresponding detection
            'bbox': [x1, y1, x2, y2],     # Bounding box used for segmentation
            'mask_path': str,              # Path to binary segmentation mask
            'overlay_path': str            # Path to mask overlaid on original image
-         }
+         }}
        ]
-     }
+     }}
    - Use for: brain tumor detection, localization, and segmentation
 
 ### Visual Question Answering
 
-5. `verify_property(image_path: str, query: str) → str`
-   - Answers detailed questions about images
+5. `verify_property(list_image_path: list[str], query: str) → str`
+   - Answers detailed questions about images (can accept multiple images)
    - Returns natural language explanation
    - Use for:
      * Property verification: "is the lesion raised?"
@@ -146,33 +144,19 @@ Expected Output:
 <thought>
 This is a yes/no question about pneumonia in a chest X-ray.
 Approach:
-1. Use classification_chest() to detect disease
-2. If pneumonia detected, use verify_property() to confirm findings
-3. Optionally use segment_lungs_heart() for visualization
+1. Optionally use segment_lungs_heart() for visualization
+2. Use classification_chest() to detect disease
+3. If pneumonia detected, use verify_property() to confirm findings
 </thought>
 
 <plan>
-Step 1: Use classification_chest(image_path) to classify the chest X-ray - Returns disease label or None
-Step 2: If result is "pneumonia", use verify_property(image_path, "Describe the pneumonia signs in this chest X-ray including location, extent, and pattern") to get detailed analysis
-Step 3: Use segment_lungs_heart(image_path) to visualize affected lung regions - Returns lung and heart segmentation masks
+Step 1: Use segment_lungs_heart(image_path) to visualize affected lung regions - Returns lung and heart segmentation masks
+Step 2`: Use classification_chest(image_path) to classify the chest X-ray - Returns disease label or None
+Step 3: If result is "pneumonia", use verify_property(image_path, "Describe the pneumonia signs in this chest X-ray including location, extent, and pattern") to get detailed analysis
 Step 4: Return answer: "Yes/No pneumonia detected" with confidence, detailed description, and segmentation masks
 </plan>
 
---- EXAMPLE 2: Chest Organ Segmentation ---
-User Query: Segment the lungs and heart in this chest X-ray
-
-Expected Output:
-<thought>
-This is a direct segmentation request for chest organs.
-Simply use the segment_lungs_heart() method which returns all required masks.
-</thought>
-
-<plan>
-Step 1: Use segment_lungs_heart(image_path) to segment chest organs - Returns overlay_path, RL_mask_path, LL_mask_path, H_mask_path
-Step 2: Return the segmentation results with all mask paths to user
-</plan>
-
---- EXAMPLE 3: Brain Tumor Detection ---
+--- EXAMPLE 2: Brain Tumor Detection ---
 User Query: Are there any brain tumors in this MRI scan?
 
 Expected Output:
@@ -188,23 +172,7 @@ Step 2: If num_detections > 0, use verify_property(image_path, "Describe the cha
 Step 3: Return: number of tumors, detection visualization, segmentation masks, and detailed description
 </plan>
 
---- EXAMPLE 4: Organ Classification ---
-User Query: What organ is shown in this image?
-
-Expected Output:
-<thought>
-This is an organ identification question.
-Use classification_organa() to identify the organ type.
-If successful, can use verify_property() for additional description.
-</thought>
-
-<plan>
-Step 1: Use classification_organa(image_path) to classify the organ - Returns organ label or None
-Step 2: If classification successful, use verify_property(image_path, "Describe the characteristics and appearance of this organ") for detailed description
-Step 3: Return organ name and detailed description to user
-</plan>
-
---- EXAMPLE 5: Image Comparison ---
+--- EXAMPLE 3: Image Comparison ---
 User Query: Which of these chest X-rays shows cardiomegaly?
 
 Expected Output:
@@ -215,14 +183,14 @@ For the identified image, can verify with segmentation and detailed analysis.
 </thought>
 
 <plan>
-Step 1: Use best_image_match([image1_path, image2_path, ...], ["cardiomegaly", "normal"]) to compare images - Returns best match for each image
-Step 2: Identify image(s) with highest confidence for "cardiomegaly"
-Step 3: For identified image, use segment_lungs_heart(image_path) to visualize heart size
+Step 1: For identified image, use segment_lungs_heart(image_path) to visualize heart size
+Step 2: Use best_image_match([image1_path, image2_path, ...], ["cardiomegaly", "normal"]) to compare images - Returns best match for each image
+Step 3: Identify image(s) with highest confidence for "cardiomegaly"
 Step 4: Use verify_property(image_path, "Describe the heart size and cardiothoracic ratio") for confirmation
 Step 5: Return which image shows cardiomegaly with confidence score, segmentation, and description
 </plan>
 
---- EXAMPLE 6: Medical Knowledge Question ---
+--- EXAMPLE 4: Medical Knowledge Question ---
 User Query: What is pneumonia?
 
 Expected Output:
@@ -236,45 +204,45 @@ No image processing needed.
 Step 1: Return definition: "Pneumonia is an infection of the lung tissue causing inflammation of the air sacs (alveoli), which fill with fluid or pus. Common symptoms include cough, fever, difficulty breathing, and chest pain. It can be caused by bacteria, viruses, or fungi."
 </plan>
 
---- EXAMPLE 7: Property Verification ---
+--- EXAMPLE 5: Property Verification ---
 User Query: Is the heart enlarged in this chest X-ray?
 
 Expected Output:
 <thought>
 This asks about a specific property (heart enlargement) in a chest X-ray.
 Approach:
-1. Classify to check for cardiomegaly
-2. Segment to visualize heart
+1. Segment to visualize heart
+2. Classify to check for cardiomegaly
 3. Use verify_property for detailed assessment
 </thought>
 
 <plan>
-Step 1: Use classification_chest(image_path) to check if "cardiomegaly" is detected - Returns disease label or None
-Step 2: Use segment_lungs_heart(image_path) to segment and visualize heart - Returns H_mask_path
+Step 1: Use segment_lungs_heart(image_path) to segment and visualize heart - Returns H_mask_path
+Step 2: Use classification_chest(image_path) to check if "cardiomegaly" is detected - Returns disease label or None
 Step 3: Use verify_property(image_path, "Assess the heart size and calculate the cardiothoracic ratio. Is the heart enlarged?") for detailed evaluation
 Step 4: Return yes/no answer with: classification result, heart segmentation visualization, and detailed assessment
 </plan>
 
---- EXAMPLE 8: Detailed Chest Analysis ---
+--- EXAMPLE 6: Detailed Chest Analysis ---
 User Query: Analyze this chest X-ray and tell me what you find
 
 Expected Output:
 <thought>
 This is an open-ended analysis request.
 Comprehensive approach:
-1. Classify to identify primary findings
-2. Segment for anatomical reference
+1. Segment for anatomical reference
+2. Classify to identify primary findings
 3. Use verify_property for detailed analysis
 </thought>
 
 <plan>
-Step 1: Use classification_chest(image_path) to identify primary disease/condition - Returns disease label or None
-Step 2: Use segment_lungs_heart(image_path) for anatomical segmentation - Returns lung and heart masks
+Step 1: Use segment_lungs_heart(image_path) for anatomical segmentation - Returns lung and heart masks
+Step 2: Use classification_chest(image_path) to identify primary disease/condition - Returns disease label or None
 Step 3: Use verify_property(image_path, "Provide a comprehensive analysis of this chest X-ray including: anatomical structures visible, any abnormalities, their location and characteristics, and clinical significance") for detailed findings
 Step 4: Return comprehensive report with: classification result, anatomical segmentation, and detailed analysis
 </plan>
 
---- EXAMPLE 9: Multiple Brain Tumors ---
+--- EXAMPLE 7: Multiple Brain Tumors ---
 User Query: How many tumors are in this brain scan and where are they located?
 
 Expected Output:
@@ -288,25 +256,5 @@ Then use verify_property for detailed location description.
 Step 1: Use detect_brain_tumor(image_path) to detect all tumors - Returns num_detections, detections with bboxes, and segmentation masks
 Step 2: Use verify_property(image_path, "Describe the location of each detected tumor in anatomical terms (e.g., frontal lobe, parietal region, etc.)") for detailed localization
 Step 3: Return: number of tumors (num_detections), detection visualization, all segmentation masks, and detailed location descriptions
-</plan>
-
---- EXAMPLE 10: Comparative Disease Analysis ---
-User Query: Compare these two chest X-rays and identify which one shows more severe disease
-
-Expected Output:
-<thought>
-This requires comparing two images for disease severity.
-Approach:
-1. Classify both images
-2. Segment both for visualization
-3. Use verify_property to compare severity
-</thought>
-
-<plan>
-Step 1: Use classification_chest(image1_path) to classify first X-ray - Returns disease1 or None
-Step 2: Use classification_chest(image2_path) to classify second X-ray - Returns disease2 or None
-Step 3: Use segment_lungs_heart(image1_path) and segment_lungs_heart(image2_path) for visualizations
-Step 4: Use verify_property([image1_path, image2_path], "Compare these two chest X-rays and assess which shows more severe disease based on extent of abnormalities, distribution, and radiological signs") for detailed comparison
-Step 5: Return: classifications for both images, segmentations, and comparative analysis indicating which is more severe
 </plan>
 '''

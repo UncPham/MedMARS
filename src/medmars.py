@@ -11,9 +11,9 @@ import numpy as np
 
 from src.agent.planner import PlannerModel
 from src.agent.coder import CoderModel
-from src.agent.reporter import ReporterModel
+from src.agent.reporter import Reporter
 # from src.tools.tools import Tools
-from executor.executor import Executor
+# from executor.executor import Executor
 from src.image_patch import ImagePatch
 
 
@@ -21,9 +21,7 @@ class MedMARS:
     def __init__(self, max_rounds: int = 3):
         self.planner = PlannerModel()
         self.code_generator = CoderModel()
-        self.reporter = ReporterModel()
-        # self.tools = Tools()
-        self.executor = Executor(time_limit_s=60)
+        self.reporter = Reporter()
 
         self.thought = None
         self.plan = None
@@ -31,7 +29,7 @@ class MedMARS:
 
         self.max_rounds = max_rounds
 
-    def run(self, query: str, image: Union[str, Path, Image.Image]):
+    def run(self, query: str, image: Union[str, Path, Image.Image], output_dir: str = None):
         if isinstance(image, (str, Path)):
             image_path = str(Path(image))
             image = Image.open(image_path).convert("RGB")
@@ -51,7 +49,11 @@ class MedMARS:
 
         print("Executing code...")
         exec_globals = globals().copy()
-        exec_globals['ImagePatch'] = ImagePatch
+        # Create ImagePatch factory with output_dir if specified
+        if output_dir:
+            exec_globals['ImagePatch'] = lambda outputs_dir=output_dir: ImagePatch(outputs_dir=outputs_dir)
+        else:
+            exec_globals['ImagePatch'] = ImagePatch
         exec(self.code, exec_globals)
         result = None
         try:
@@ -75,7 +77,7 @@ class MedMARS:
 
         # env = self.tools.as_exec_env()
         # result = self.executor.run(self.code, env)
-        return out, result, response
+        return self.thought, self.plan, self.code, out, result, response
 
 
 if __name__ == "__main__":

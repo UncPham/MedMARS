@@ -44,8 +44,8 @@ class ImagePatch:
             return best_label[0]
         return None
     
-    def verify_property(self, image_path: str, query: str):
-        outputs = self.explainer(image_path, query)
+    def verify_property(self, list_image_path: list[str], query: str):
+        outputs = self.explainer(query, list_image_path)
         return outputs
 
     def segment_lungs_heart(self, image_path: str):

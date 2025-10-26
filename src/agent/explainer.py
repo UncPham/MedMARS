@@ -80,40 +80,11 @@ class Explainer:
                 "content": query
             })
 
-        # Call Azure OpenAI API with error handling for content filter
-        try:
-            response = self.client.chat.completions.create(
-                model=AZURE_OPENAI_DEPLOYMENT,
-                messages=messages,
-                temperature=0.3,
-                max_tokens=2000
-            )
-            return response.choices[0].message.content
 
-        except Exception as e:
-            error_message = str(e)
-            if "content_filter" in error_message or "ResponsibleAIPolicyViolation" in error_message:
-                # Content filter triggered - return a safe fallback
-                print(f"Warning: Content filter triggered for images. Using text-only fallback.")
-                # Retry without images
-                fallback_messages = [
-                    {"role": "system", "content": EXPLAINER_PROMPT},
-                    {"role": "user", "content": f"{query}\n\nNote: Image analysis was blocked by content policy. Please provide a text-based explanation."}
-                ]
-                response = self.client.chat.completions.create(
-                    model=AZURE_OPENAI_DEPLOYMENT,
-                    messages=fallback_messages,
-                    temperature=0.3,
-                    max_tokens=2000
-                )
-                return response.choices[0].message.content
-            else:
-                # Other error - re-raise
-                raise e
-
-if __name__ == "__main__":
-    explainer = Explainer()
-    explanation = explainer(
-        "The patient has a cough and difficulty breathing.",
-    )
-    print("Explanation:", explanation)
+        response = self.client.chat.completions.create(
+            model=AZURE_OPENAI_DEPLOYMENT,
+            messages=messages,
+            temperature=0.3,
+            max_tokens=2000
+        )
+        return response.choices[0].message.content
