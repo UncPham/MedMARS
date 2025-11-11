@@ -7,6 +7,21 @@ REPORTER_PROMPT = '''
 
 **Analysis Results**: {output}
 
+**IMPORTANT - Extracting Image Paths from Analysis Results**:
+The Analysis Results is a Python dictionary that may contain image paths. You MUST extract and use these paths in your explanation.
+
+Common path keys in the dictionary:
+- `overlay_path`: Overlay visualization image
+- `detection_path`: Detection visualization with bounding boxes
+- `mask_path`, `RL_mask_path`, `LL_mask_path`, `H_mask_path`: Segmentation masks
+- `segmentations`: List of dictionaries containing `mask_path` and `overlay_path` for each detection
+
+**How to extract paths from the dictionary**:
+1. Look for keys ending with `_path` in the Analysis Results
+2. Extract the full path value (e.g., if you see `'overlay_path': '/path/to/image.png'`, use `/path/to/image.png`)
+3. Use the FULL PATH in markdown image syntax: `![Description](/path/to/image.png)`
+4. If `segmentations` exists, iterate through the list to get each segmentation's paths
+
 **Task**: Provide a response with two parts:
 1. **<answer>**: Direct, concise answer to the question
 2. **<explanation>**: Clear explanation of WHY this is the answer based on the analysis
@@ -94,7 +109,10 @@ REPORTER_PROMPT = '''
 
 **Examples:**
 
-**Example 1 - Detection Question:**
+**Example 1 - Detection Question with Segmentation Output:**
+
+Analysis Results: {{'pneumonia_detected': True, 'diagnosis': 'pneumonia', 'segmentation_paths': {{'overlay_path': 'logs/20251024/vqa_0/chest_overlay.png', 'RL_mask_path': 'logs/20251024/vqa_0/right_lung.png', 'LL_mask_path': 'logs/20251024/vqa_0/left_lung.png'}}, 'detailed_analysis': 'Signs of consolidation in right lower lobe...'}}
+
 ```
 <answer>
 Yes
@@ -105,7 +123,7 @@ To evaluate your lungs, we analyzed the X-ray image using specialized detection 
 
 What we found is an area of concern in the right lower part of your lung. Below is the segmentation showing the affected region highlighted:
 
-![Lung Segmentation](mask_path)
+![Right Lung Segmentation](logs/20251024/vqa_0/right_lung.png)
 
 As you can see in the image above, the affected area is clearly marked in the right lower lobe. The image shows patchy, cloudy areas that appear denser than normal lung tissue.
 
@@ -113,36 +131,42 @@ These patterns are characteristic of pneumonia - when infection causes inflammat
 
 Here's the overlay visualization showing the full context:
 
-![Chest X-ray with Overlay](overlay_path)
+![Chest X-ray with Overlay](logs/20251024/vqa_0/chest_overlay.png)
 
 Based on these visual findings and the strong detection confidence, we can confirm the presence of pneumonia in your right lower lobe.
 </explanation>
 ```
 
-**Example 2 - Classification Question:**
+**Example 2 - Brain Tumor Detection with Multiple Segmentations:**
+
+Analysis Results: {{'num_tumors': 2, 'detection_visualization': 'logs/20251024/vqa_1/brain_detection.png', 'segmentations': [{{'detection_index': 0, 'bbox': [120, 80, 180, 140], 'mask_path': 'logs/20251024/vqa_1/tumor_0_mask.png', 'overlay_path': 'logs/20251024/vqa_1/tumor_0_overlay.png'}}, {{'detection_index': 1, 'bbox': [200, 150, 250, 200], 'mask_path': 'logs/20251024/vqa_1/tumor_1_mask.png', 'overlay_path': 'logs/20251024/vqa_1/tumor_1_overlay.png'}}], 'detailed_description': 'Two tumors detected - one glioma in frontal lobe, one meningioma in parietal region...'}}
+
 ```
 <answer>
-Glioma tumor.
+2 tumors detected.
 </answer>
 
 <explanation>
-We performed a detailed analysis of your brain scan to identify and classify the mass we detected. Our analysis found one tumor located in the left frontal lobe region of your brain.
+We performed a detailed analysis of your brain scan and detected two distinct tumors. Here's the detection visualization showing both tumors with their boundaries clearly marked:
 
-Here's the detection image with the tumor boundaries clearly marked:
+![Brain Tumor Detection](logs/20251024/vqa_1/brain_detection.png)
 
-![Brain Tumor Detection](overlay_path)
+The first tumor is located in the frontal lobe region. Below is the precise segmentation for this tumor:
 
-Notice how the edges are somewhat irregular rather than perfectly round - this is one of the characteristics we look for. The tumor also shows a mixed pattern of light and dark areas, which tells us about the tissue composition.
+![First Tumor Segmentation](logs/20251024/vqa_1/tumor_0_overlay.png)
 
-Based on these visual features - the location in the frontal lobe, the irregular borders, and the varied appearance of the tissue - this tumor is classified as a glioma. Our analysis shows 92% confidence in this classification. Gliomas are tumors that develop from the supportive tissue of the brain.
+The second tumor is in the parietal region. Here's its segmentation:
 
-Below is the precise segmentation outlining the tumor area, which will be helpful for treatment planning and monitoring:
+![Second Tumor Segmentation](logs/20251024/vqa_1/tumor_1_overlay.png)
 
-![Tumor Segmentation Mask](mask_path)
+Based on the characteristics observed - including their locations, irregular borders, and tissue appearance - these require immediate medical attention and further evaluation to determine the appropriate treatment plan.
 </explanation>
 ```
 
-**Example 3 - Negative/Normal Result:**
+**Example 3 - Negative/Normal Result with Heart Segmentation:**
+
+Analysis Results: {{'heart_enlarged': False, 'classification': None, 'heart_mask': 'logs/20251024/vqa_2/heart_mask.png', 'overlay': 'logs/20251024/vqa_2/chest_overlay.png', 'detailed_assessment': 'Cardiothoracic ratio is 0.45, within normal range. Heart borders are smooth and regular...'}}
+
 ```
 <answer>
 No
@@ -153,13 +177,13 @@ We carefully examined your chest X-ray to check for signs of an enlarged heart (
 
 Looking at the analysis below, you can see the outline of your heart in relation to your chest cavity:
 
-![Heart and Chest Segmentation](overlay_path)
+![Heart and Chest Segmentation](logs/20251024/vqa_2/chest_overlay.png)
 
-We measure something called the cardiothoracic ratio - essentially comparing the width of your heart to the width of your chest. Your ratio is less than 0.5 (or 50%), which is within the healthy normal range.
+We measure something called the cardiothoracic ratio - essentially comparing the width of your heart to the width of your chest. Your ratio is 0.45 (or 45%), which is within the healthy normal range.
 
 Additionally, the borders of your heart have a regular, smooth appearance, and the overall shape looks healthy. Here's the heart segmentation showing the proportions clearly:
 
-![Heart Size Visualization](mask_path)
+![Heart Size Visualization](logs/20251024/vqa_2/heart_mask.png)
 
 As you can see in the image above, your heart size is well-proportioned to your chest cavity - exactly what we want to see. Our analysis did not find any indicators of enlargement, and we can confidently say your heart size is normal. This is a reassuring finding.
 </explanation>

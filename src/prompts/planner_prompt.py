@@ -40,33 +40,9 @@ PLANNER_PROMPT = '''
      }}
    - Use for: anatomical segmentation of chest X-rays
 
-4. `detect_brain_tumor(image_path: str) → dict`
-   - Detects and segments brain tumors in MRI/CT using YOLO detection + MedSAM segmentation
-   - Returns:
-     {{
-       'detection_path': str,  # Path to detection visualization image
-       'detections': [         # List of detected tumors
-         {{
-           'class': str,        # Detected class label
-           'confidence': float, # Confidence score of detection
-           'bbox': [x1, y1, x2, y2],  # Bounding box coordinates
-         }}
-       ],
-       'num_detections': int,  # Total number of tumors detected
-       'segmentations': [      # List of segmentation results (one per detection)
-         {{
-           'detection_index': int,        # Index of corresponding detection
-           'bbox': [x1, y1, x2, y2],     # Bounding box used for segmentation
-           'mask_path': str,              # Path to binary segmentation mask
-           'overlay_path': str            # Path to mask overlaid on original image
-         }}
-       ]
-     }}
-   - Use for: brain tumor detection, localization, and segmentation
-
 ### Visual Question Answering
 
-5. `verify_property(list_image_path: list[str], query: str) → str`
+4. `verify_property(list_image_path: list[str], query: str) → str`
    - Answers detailed questions about images (can accept multiple images)
    - Returns natural language explanation
    - Use for:

@@ -65,87 +65,6 @@ class ImagePatch:
             'H_mask_path': '/path/to/heart.png'
         }}
 
-    segment_bowel_stomach(image_path: str) → dict
-        Segments bowel and stomach regions in abdominal images.
-
-        Returns:
-            dict: {{
-                'overlay_path': str,              # Overlay visualization
-                'large_bowel_mask_path': str,     # Large bowel mask
-                'small_bowel_mask_path': str,     # Small bowel mask
-                'stomach_mask_path': str,         # Stomach mask
-                'segmentation_info': [            # Statistics for each organ
-                    {{
-                        'class': str,             # e.g., 'large bowel'
-                        'percentage': float,      # % of image covered
-                        'color': tuple           # RGB color (R, G, B)
-                    }},
-                    ...
-                ]
-            }}
-
-        Example: {{
-            'overlay_path': '/path/to/abdomen_overlay.png',
-            'large_bowel_mask_path': '/path/to/large_bowel.png',
-            'small_bowel_mask_path': '/path/to/small_bowel.png',
-            'stomach_mask_path': '/path/to/stomach.png',
-            'segmentation_info': [
-                {{'class': 'large bowel', 'percentage': 15.3, 'color': (0, 0, 255)}},
-                {{'class': 'small bowel', 'percentage': 22.1, 'color': (23, 154, 0)}},
-                {{'class': 'stomach', 'percentage': 8.7, 'color': (255, 127, 0)}}
-            ]
-        }}
-
-    detect_brain_tumor(image_path: str) → dict
-        Detects and segments brain tumors in MRI/CT scans using YOLO + MedSAM.
-        Can detect 3 tumor types: glioma, meningioma, pituitary.
-
-        Returns:
-            dict: {{
-                'detection_path': str,        # Visualization with bounding boxes
-                'num_detections': int,        # Total number of tumors found
-                'detections': [               # List of detected tumors
-                    {{
-                        'class': str,         # 'glioma'/'meningioma'/'pituitary'
-                        'confidence': float,  # Detection confidence (0.0-1.0)
-                        'bbox': [x1, y1, x2, y2]  # Bounding box coordinates
-                    }},
-                    ...
-                ],
-                'segmentations': [            # Segmentation for each detection
-                    {{
-                        'detection_index': int,      # Index in detections list
-                        'bbox': [x1, y1, x2, y2],   # Same bbox as detection
-                        'mask_path': str,            # Binary segmentation mask
-                        'overlay_path': str          # Mask overlaid on image
-                    }},
-                    ...
-                ]
-            }}
-
-        Example: {{
-            'detection_path': '/path/to/brain_detection.png',
-            'num_detections': 2,
-            'detections': [
-                {{'class': 'glioma', 'confidence': 0.92, 'bbox': [120, 80, 180, 140]}},
-                {{'class': 'meningioma', 'confidence': 0.87, 'bbox': [200, 150, 250, 200]}}
-            ],
-            'segmentations': [
-                {{
-                    'detection_index': 0,
-                    'bbox': [120, 80, 180, 140],
-                    'mask_path': '/path/to/tumor_0_mask.png',
-                    'overlay_path': '/path/to/tumor_0_overlay.png'
-                }},
-                {{
-                    'detection_index': 1,
-                    'bbox': [200, 150, 250, 200],
-                    'mask_path': '/path/to/tumor_1_mask.png',
-                    'overlay_path': '/path/to/tumor_1_overlay.png'
-                }}
-            ]
-        }}
-
     verify_property(list_image_path: list[str], query: str) → str
         Verifies specific visual properties or answers detailed questions about images.
         Can analyze multiple images including processed outputs from vision models.
@@ -206,37 +125,6 @@ class ImagePatch:
         >>> #   'RL_mask_path': '/path/to/right_lung.png',
         >>> #   'LL_mask_path': '/path/to/left_lung.png',
         >>> #   'H_mask_path': '/path/to/heart.png'
-        >>> # }}
-        """
-        pass
-
-    def segment_bowel_stomach(self, image_path: str) -> dict:
-        """
-        Example:
-        >>> result = image_patch.segment_bowel_stomach("abdomen_scan.png")
-        >>> # Returns: {{
-        >>> #   'overlay_path': '/path/to/abdomen_overlay.png',
-        >>> #   'large_bowel_mask_path': '/path/to/large_bowel.png',
-        >>> #   'small_bowel_mask_path': '/path/to/small_bowel.png',
-        >>> #   'stomach_mask_path': '/path/to/stomach.png',
-        >>> #   'segmentation_info': [
-        >>> #       {{'class': 'large bowel', 'percentage': 15.3, 'color': (0, 0, 255)}},
-        >>> #       {{'class': 'small bowel', 'percentage': 22.1, 'color': (23, 154, 0)}},
-        >>> #       {{'class': 'stomach', 'percentage': 8.7, 'color': (255, 127, 0)}}
-        >>> #   ]
-        >>> # }}
-        """
-        pass
-
-    def detect_brain_tumor(self, image_path: str) -> dict:
-        """
-        Example:
-        >>> result = image_patch.detect_brain_tumor("brain_mri.png")
-        >>> # Returns: {{
-        >>> #   'num_detections': 2,
-        >>> #   'detection_path': '/path/to/detection.png',
-        >>> #   'detections': [{{bbox: [x1,y1,x2,y2]}}, ...],
-        >>> #   'segmentations': [{{mask_path: '...', overlay_path: '...'}}, ...]
         >>> # }}
         """
         pass
@@ -303,43 +191,7 @@ def execute_command(image_path):
         "segmentation_paths": segmentation,
     }}
 
-### Example 2: Brain Tumor Detection and Analysis
-Plan:
-Step 1: Use detect_brain_tumor(image_path) to detect and segment tumors
-Step 2: If tumors detected, use verify_property with detection and segmentation images for detailed characterization
-Step 3: Return tumor count, visualizations, and detailed description
-
-A:
-def execute_command(image_path):
-    image_patch = ImagePatch()
-
-    # Step 1: Detect and segment tumors
-    tumor_result = image_patch.detect_brain_tumor(image_path)
-
-    # Step 2: Detailed analysis if tumors detected
-    # Collect all segmentation overlay images for explainer
-    detailed_description = None
-    if tumor_result['num_detections'] > 0:
-        # Prepare list of images: original + detection + segmentation overlays
-        analysis_images = [image_path, tumor_result['detection_path']]
-        for seg in tumor_result['segmentations']:
-            analysis_images.append(seg['overlay_path'])
-
-        detailed_description = image_patch.verify_property(
-            analysis_images,
-            "Describe the characteristics of the detected brain tumors including size, location, and appearance. Analyze the detection and segmentation images provided."
-        )
-
-    # Step 3: Return comprehensive results
-    return {{
-        "num_tumors": tumor_result['num_detections'],
-        "tumors_detected": tumor_result['num_detections'] > 0,
-        "detection_visualization": tumor_result['detection_path'],
-        "segmentations": tumor_result['segmentations'],
-        "detailed_description": detailed_description,
-    }}
-
-### Example 3: Medical Knowledge Question
+### Example 2: Medical Knowledge Question
 Plan:
 Step 1: Return definition of pneumonia
 
@@ -351,7 +203,7 @@ def execute_command(image_path=None):
         "type": "medical_knowledge"
     }}
 
-### Example 4: Heart Enlargement Assessment
+### Example 3: Heart Enlargement Assessment
 Plan:
 Step 1: Use segment_lungs_heart to visualize heart
 Step 2: Use classification_chest to check for cardiomegaly
@@ -386,7 +238,7 @@ def execute_command(image_path):
         "recommendation": "Cardiology consultation recommended" if is_enlarged else "Heart size appears normal"
     }}
 
-### Example 5: Comprehensive Chest X-Ray Analysis
+### Example 4: Comprehensive Chest X-Ray Analysis
 Plan:
 Step 1: Use segment_lungs_heart for anatomical segmentation
 Step 2: Use classification_chest to identify primary findings
@@ -421,37 +273,5 @@ def execute_command(image_path):
         "comprehensive_analysis": comprehensive_analysis,
         "has_abnormality": disease is not None,
         "recommendation": "Medical review recommended" if disease else "Appears normal"
-    }}
-
-### Example 6: Tumor Count and Localization
-Plan:
-Step 1: Use detect_brain_tumor to detect all tumors
-Step 2: Use verify_property for detailed location descriptions
-Step 3: Return count, locations, and visualizations
-
-A:
-def execute_command(image_path):
-    image_patch = ImagePatch()
-
-    # Step 1: Detect tumors
-    tumor_result = image_patch.detect_brain_tumor(image_path)
-
-    # Step 2: Get location descriptions if tumors found
-    # Use detection image with bounding boxes for analysis
-    location_description = None
-    if tumor_result['num_detections'] > 0:
-        location_description = image_patch.verify_property(
-            [image_path, tumor_result['detection_path']],
-            "Describe the location of each detected tumor in anatomical terms (e.g., frontal lobe, parietal region, etc.). Use the detection visualization to identify tumor positions."
-        )
-
-    # Step 3: Return comprehensive results
-    return {{
-        "tumor_count": tumor_result['num_detections'],
-        "detection_visualization": tumor_result['detection_path'],
-        "tumor_bounding_boxes": tumor_result['detections'],
-        "segmentation_masks": tumor_result['segmentations'],
-        "anatomical_locations": location_description,
-        "urgency": "HIGH" if tumor_result['num_detections'] > 0 else "NONE"
     }}
 '''
