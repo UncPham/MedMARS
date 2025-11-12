@@ -17,13 +17,16 @@ CHECKPOINT_FOLDER = PROJECT_ROOT / "src" / "checkpoint"
 STATIC_FOLDER.mkdir(exist_ok=True)
 
 # Specific checkpoint files
-GROUNDING_DINO_CHECKPOINT = CHECKPOINT_FOLDER / "groundingdino_swint_ogc.pth"
-SAM_CHECKPOINT = CHECKPOINT_FOLDER / "sam_vit_h_4b8939.pth"
+DEIM_CHECKPOINT = CHECKPOINT_FOLDER / "best_stg1.pth"
 
-# API Keys and Endpoints
+# Azure OpenAI Configuration
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
 AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT")
+
+# Google Gemini Configuration
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
 
 

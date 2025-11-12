@@ -4,26 +4,45 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from openai import AzureOpenAI
+import google.generativeai as genai
 import base64
 from pathlib import Path
+from PIL import Image
 
 from src.constants.env import (
     AZURE_OPENAI_API_KEY,
     AZURE_OPENAI_DEPLOYMENT,
     AZURE_OPENAI_API_VERSION,
     AZURE_OPENAI_ENDPOINT,
+    GEMINI_API_KEY,
+    GEMINI_MODEL,
 )
 from src.prompts.explainer_prompt import EXPLAINER_PROMPT
 
 
 class Explainer:
-    def __init__(self,):
-        self.client = AzureOpenAI(
-            api_key=AZURE_OPENAI_API_KEY,
-            azure_endpoint=AZURE_OPENAI_ENDPOINT,
-            api_version=AZURE_OPENAI_API_VERSION,
-        )
-        self.deployment_name = AZURE_OPENAI_DEPLOYMENT,
+    def __init__(self, model_provider: str = "openai"):
+        """
+        Initialize Explainer with specified model provider.
+
+        Args:
+            model_provider: Either "openai" or "gemini"
+        """
+        self.model_provider = model_provider.lower()
+
+        if self.model_provider == "openai":
+            self.client = AzureOpenAI(
+                api_key=AZURE_OPENAI_API_KEY,
+                azure_endpoint=AZURE_OPENAI_ENDPOINT,
+                api_version=AZURE_OPENAI_API_VERSION,
+            )
+            self.deployment_name = AZURE_OPENAI_DEPLOYMENT
+        elif self.model_provider == "gemini":
+            genai.configure(api_key=GEMINI_API_KEY)
+            self.client = genai.GenerativeModel(GEMINI_MODEL)
+            self.deployment_name = GEMINI_MODEL
+        else:
+            raise ValueError(f"Unsupported model provider: {model_provider}. Use 'openai' or 'gemini'.")
 
 
     def _encode_image(self, image_path: str) -> str:
@@ -32,7 +51,25 @@ class Explainer:
             return base64.b64encode(image_file.read()).decode("utf-8")
 
     def __call__(self, query: str, list_image: list = None) -> str:
+        """
+        Generate explanation based on query and images.
 
+        Args:
+            query: The user's question
+            list_image: Optional list of image paths
+
+        Returns:
+            Explanation text
+        """
+        if self.model_provider == "openai":
+            return self._call_openai(query, list_image)
+        elif self.model_provider == "gemini":
+            return self._call_gemini(query, list_image)
+        else:
+            raise ValueError(f"Unsupported model provider: {self.model_provider}")
+
+    def _call_openai(self, query: str, list_image: list = None) -> str:
+        """Call Azure OpenAI API"""
         messages = [
             {"role": "system", "content": EXPLAINER_PROMPT}
         ]
@@ -80,7 +117,6 @@ class Explainer:
                 "content": query
             })
 
-
         response = self.client.chat.completions.create(
             model=AZURE_OPENAI_DEPLOYMENT,
             messages=messages,
@@ -88,3 +124,28 @@ class Explainer:
             max_tokens=2000
         )
         return response.choices[0].message.content
+
+    def _call_gemini(self, query: str, list_image: list = None) -> str:
+        """Call Google Gemini API"""
+        # Combine system prompt with user query
+        full_prompt = f"{EXPLAINER_PROMPT}\n\n{query}"
+
+        # Build content parts
+        content_parts = [full_prompt]
+
+        # Add images if provided
+        if list_image and len(list_image) > 0:
+            for image_path in list_image:
+                if Path(image_path).exists():
+                    image = Image.open(image_path)
+                    content_parts.append(image)
+
+        response = self.client.generate_content(
+            content_parts,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.3,
+                max_output_tokens=2000,
+            )
+        )
+
+        return response.text
