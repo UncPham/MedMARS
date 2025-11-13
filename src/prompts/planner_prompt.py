@@ -10,15 +10,16 @@ PLANNER_PROMPT = '''
 
 ### Classification Methods
 
-1. `classification_chest(image_path: str) → str or None`
+1. `classification_chest(image_path: str) → list[str] or None`
    - Classifies chest X-ray images into disease categories
    - Uses ChestMNIST labels
-   - Returns disease label if confidence > 0.4, None otherwise
+   - Returns ["label1", "label2", ...]: list of all detected labels with confidence > 0.4, None if nothing detected
+   - Can detect multiple conditions simultaneously (e.g., ["Cardiomegaly", "Pleural effusion"])
    - CHESTMNIST_LABEL = [
-       "atelectasis", "cardiomegaly", "effusion", "infiltration",
-       "mass", "nodule", "pneumonia", "pneumothorax",
-       "consolidation", "edema", "emphysema", "fibrosis",
-       "pleural", "hernia"
+      "Aortic enlargement", "Pleural thickening", "Pleural effusion",
+      "Cardiomegaly", "Lung Opacity", "Nodule/Mass", "Consolidation",
+      "Pulmonary fibrosis", "Infiltration", "Atelectasis", "Other lesion",
+      "ILD", "Pneumothorax", "Calcification"
    ]
 
 2. `best_image_match(images_path: list[str], labels: list[str]) → dict`
@@ -40,9 +41,38 @@ PLANNER_PROMPT = '''
      }}
    - Use for: anatomical segmentation of chest X-rays
 
+### Detection and Segmentation Methods
+
+4. `detect_chest_abnormality(image_path: str) → dict`
+   - Detects and segments chest abnormalities (e.g., lesions, nodules, infiltrates) in chest X-rays
+   - Uses DEIM model for detection and MedSAM model for precise segmentation of each detected abnormality
+   - Returns:
+     {{
+       'detection': {{
+         'boxes': array of bounding boxes [x1, y1, x2, y2],
+         'scores': confidence scores for each detection,
+         'labels': numeric labels for each detection,
+         'label_names': human-readable labels (e.g., "Aortic enlargement", "Pleural effusion"),
+         'overlay_paths': dict of overlay images per class
+       }},
+       'segmentations': [
+         {{
+           'mask_path': path to segmentation mask,
+           'overlay_path': path to overlay visualization,
+           'abnormality': abnormality type name,
+           'box': bounding box [x1, y1, x2, y2]
+         }},
+         ...
+       ]
+     }}
+   - Use for: detecting and segmenting specific abnormalities in chest X-rays
+   - Categories detected: Aortic enlargement, Pleural thickening, Pleural effusion, Cardiomegaly,
+     Lung Opacity, Nodule/Mass, Consolidation, Pulmonary fibrosis, Infiltration, Atelectasis,
+     Other lesion, ILD, Pneumothorax, Calcification
+
 ### Visual Question Answering
 
-4. `verify_property(list_image_path: list[str], query: str) → str`
+5. `verify_property(list_image_path: list[str], query: str) → str`
    - Answers detailed questions about images (can accept multiple images)
    - Returns natural language explanation
    - Use for:
@@ -60,7 +90,7 @@ PLANNER_PROMPT = '''
 
 2. **Choose Appropriate Methods**
    - Use classification methods for disease/organ identification
-   - Use segmentation methods for localization and visualization
+   - Use detection methods for localization and visualization
    - Use verify_property for detailed analysis and verification
    - Combine methods when needed for comprehensive analysis
 
@@ -73,8 +103,7 @@ PLANNER_PROMPT = '''
 4. **Handle Different Question Types**
    - **Yes/No questions**: Use appropriate detection/classification + verification
    - **"What is" questions**: Use classification or verify_property
-   - **Location questions**: Use segmentation methods
-   - **Comparison questions**: Use best_image_match or verify_property
+   - **Location questions**: Use detection
    - **Medical knowledge**: Return answer directly without image analysis
 
 **Output Format:**
@@ -119,54 +148,22 @@ User Query: Is there pneumonia in this chest X-ray?
 Expected Output:
 <thought>
 This is a yes/no question about pneumonia in a chest X-ray.
-Approach:
-1. Optionally use segment_lungs_heart() for visualization
-2. Use classification_chest() to detect disease
-3. If pneumonia detected, use verify_property() to confirm findings
+Clinical approach - following diagnostic workflow:
+1. First, perform general disease classification to identify if pneumonia is present
+2. Then, use targeted abnormality detection to locate specific pneumonia indicators (infiltration, consolidation, lung opacity) with precise localization
+3. Cross-validate findings: classification provides diagnosis, detection provides anatomical evidence
+4. Finally, synthesize all visual evidence through detailed analysis to provide comprehensive clinical assessment
 </thought>
 
 <plan>
-Step 1: Use segment_lungs_heart(image_path) to visualize affected lung regions - Returns lung and heart segmentation masks
-Step 2`: Use classification_chest(image_path) to classify the chest X-ray - Returns disease label or None
-Step 3: If result is "pneumonia", use verify_property(image_path, "Describe the pneumonia signs in this chest X-ray including location, extent, and pattern") to get detailed analysis
-Step 4: Return answer: "Yes/No pneumonia detected" with confidence, detailed description, and segmentation masks
+Step 1: Use classification_chest(image_path) to classify the chest X-ray - Returns disease label or None (establishes primary diagnosis)
+Step 2: Use detect_chest_abnormality(image_path) to detect infiltration, consolidation, or lung opacity - Returns detection with bboxes and segmentation masks (provides anatomical evidence)
+Step 3: Cross-validate results: check if classification indicates "pneumonia" AND detection found pneumonia-related abnormalities (infiltration/consolidation/opacity)
+Step 4: If pneumonia indicators found, use verify_property with all images (original, detection overlays with bboxes, abnormality segmentation masks) to provide detailed clinical analysis: "Describe the pneumonia signs including anatomical location, extent of involvement, pattern (lobar vs diffuse), and severity assessment"
+Step 5: Return comprehensive answer: "Yes/No pneumonia detected" with classification result, detected abnormalities with precise locations, segmentation visualizations, and detailed clinical assessment with recommendations
 </plan>
 
---- EXAMPLE 2: Brain Tumor Detection ---
-User Query: Are there any brain tumors in this MRI scan?
-
-Expected Output:
-<thought>
-This is a tumor detection question for brain MRI.
-Use detect_brain_tumor() which handles both detection and segmentation automatically.
-Then verify findings with explainer if tumors are detected.
-</thought>
-
-<plan>
-Step 1: Use detect_brain_tumor(image_path) to detect and segment tumors - Returns num_detections, detection_path, and segmentation masks
-Step 2: If num_detections > 0, use verify_property(image_path, "Describe the characteristics of the detected brain tumors including size, location, and appearance") for detailed analysis
-Step 3: Return: number of tumors, detection visualization, segmentation masks, and detailed description
-</plan>
-
---- EXAMPLE 3: Image Comparison ---
-User Query: Which of these chest X-rays shows cardiomegaly?
-
-Expected Output:
-<thought>
-This requires comparing multiple images for a specific condition (cardiomegaly).
-Use best_image_match() with cardiomegaly and normal as labels.
-For the identified image, can verify with segmentation and detailed analysis.
-</thought>
-
-<plan>
-Step 1: For identified image, use segment_lungs_heart(image_path) to visualize heart size
-Step 2: Use best_image_match([image1_path, image2_path, ...], ["cardiomegaly", "normal"]) to compare images - Returns best match for each image
-Step 3: Identify image(s) with highest confidence for "cardiomegaly"
-Step 4: Use verify_property(image_path, "Describe the heart size and cardiothoracic ratio") for confirmation
-Step 5: Return which image shows cardiomegaly with confidence score, segmentation, and description
-</plan>
-
---- EXAMPLE 4: Medical Knowledge Question ---
+--- EXAMPLE 2: Medical Knowledge Question ---
 User Query: What is pneumonia?
 
 Expected Output:
@@ -180,57 +177,47 @@ No image processing needed.
 Step 1: Return definition: "Pneumonia is an infection of the lung tissue causing inflammation of the air sacs (alveoli), which fill with fluid or pus. Common symptoms include cough, fever, difficulty breathing, and chest pain. It can be caused by bacteria, viruses, or fungi."
 </plan>
 
---- EXAMPLE 5: Property Verification ---
+--- EXAMPLE 3: Property Verification ---
 User Query: Is the heart enlarged in this chest X-ray?
 
 Expected Output:
 <thought>
-This asks about a specific property (heart enlargement) in a chest X-ray.
-Approach:
-1. Segment to visualize heart
-2. Classify to check for cardiomegaly
-3. Use verify_property for detailed assessment
+This is a specific clinical question about cardiomegaly (heart enlargement).
+Systematic diagnostic approach - following cardiological assessment protocol:
+1. Start with disease classification to screen for cardiomegaly diagnosis
+2. Use targeted abnormality detection to precisely localize the heart borders with bounding box - provides objective evidence
+3. Perform anatomical segmentation to measure heart and lung fields for cardiothoracic ratio calculation - the quantitative gold standard
+4. Integrate all findings through expert analysis: combine automated detection (objective), anatomical measurements (quantitative), and clinical interpretation (qualitative)
+This multi-layered approach ensures both sensitivity (detecting if present) and specificity (confirming with measurements).
 </thought>
 
 <plan>
-Step 1: Use segment_lungs_heart(image_path) to segment and visualize heart - Returns H_mask_path
-Step 2: Use classification_chest(image_path) to check if "cardiomegaly" is detected - Returns disease label or None
-Step 3: Use verify_property(image_path, "Assess the heart size and calculate the cardiothoracic ratio. Is the heart enlarged?") for detailed evaluation
-Step 4: Return yes/no answer with: classification result, heart segmentation visualization, and detailed assessment
+Step 1: Use classification_chest(image_path) to check if "cardiomegaly" is detected - Returns disease label or None (initial screening)
+Step 2: Use detect_chest_abnormality(image_path) to detect cardiomegaly - Returns detection with precise bbox if present (confirms location and extent)
+Step 3: Use segment_lungs_heart(image_path) to segment heart and lung fields - Returns H_mask_path, RL_mask_path, LL_mask_path (enables cardiothoracic ratio measurement)
+Step 4: Use verify_property with all visual evidence (original image, cardiomegaly detection overlay if present, heart segmentation mask) to provide clinical assessment: "Evaluate the heart size and calculate the cardiothoracic ratio. Is the heart enlarged? Explain the findings with reference to normal values (CTR < 0.5)"
+Step 5: Return definitive yes/no answer with: classification result, detection visualization with bbox, cardiothoracic ratio measurement from segmentation, and comprehensive clinical assessment with severity grading if enlarged
 </plan>
 
---- EXAMPLE 6: Detailed Chest Analysis ---
+--- EXAMPLE 4: Detailed Chest Analysis ---
 User Query: Analyze this chest X-ray and tell me what you find
 
 Expected Output:
 <thought>
-This is an open-ended analysis request.
-Comprehensive approach:
-1. Segment for anatomical reference
-2. Classify to identify primary findings
-3. Use verify_property for detailed analysis
+This is an open-ended comprehensive analysis request - requires systematic radiological evaluation.
+Complete diagnostic workflow - following standard chest X-ray interpretation protocol:
+1. Begin with anatomical segmentation to establish normal structures baseline (lungs, heart) - this provides reference for identifying abnormalities
+2. Perform targeted abnormality detection across all pathological categories to identify any present findings with precise localization
+3. Apply disease classification to determine primary diagnosis from overall image appearance
+4. Synthesize all findings through detailed analysis: correlate anatomical changes, localized abnormalities, and disease classification into coherent clinical report
+This systematic approach mirrors how radiologists read chest X-rays: anatomy first → abnormalities → overall impression → clinical correlation.
 </thought>
 
 <plan>
-Step 1: Use segment_lungs_heart(image_path) for anatomical segmentation - Returns lung and heart masks
-Step 2: Use classification_chest(image_path) to identify primary disease/condition - Returns disease label or None
-Step 3: Use verify_property(image_path, "Provide a comprehensive analysis of this chest X-ray including: anatomical structures visible, any abnormalities, their location and characteristics, and clinical significance") for detailed findings
-Step 4: Return comprehensive report with: classification result, anatomical segmentation, and detailed analysis
-</plan>
-
---- EXAMPLE 7: Multiple Brain Tumors ---
-User Query: How many tumors are in this brain scan and where are they located?
-
-Expected Output:
-<thought>
-This asks for counting and localization of brain tumors.
-detect_brain_tumor() handles both detection and segmentation.
-Then use verify_property for detailed location description.
-</thought>
-
-<plan>
-Step 1: Use detect_brain_tumor(image_path) to detect all tumors - Returns num_detections, detections with bboxes, and segmentation masks
-Step 2: Use verify_property(image_path, "Describe the location of each detected tumor in anatomical terms (e.g., frontal lobe, parietal region, etc.)") for detailed localization
-Step 3: Return: number of tumors (num_detections), detection visualization, all segmentation masks, and detailed location descriptions
+Step 1: Use segment_lungs_heart(image_path) for anatomical segmentation - Returns lung and heart masks (establishes anatomical baseline)
+Step 2: Use detect_chest_abnormality(image_path) to detect and segment any abnormalities - Returns detection with bboxes and segmentation masks for each abnormality (identifies all pathological findings)
+Step 3: Use classification_chest(image_path) to identify primary disease/condition - Returns disease label or None (provides overall diagnostic impression)
+Step 4: Use verify_property with comprehensive visual evidence (original image, anatomical segmentation overlay, all detection overlays, individual abnormality masks) to generate detailed radiological report: "Provide comprehensive chest X-ray analysis including: 1) Technical quality, 2) Anatomical structures assessment, 3) All detected abnormalities with locations and characteristics, 4) Primary diagnosis, 5) Clinical significance and recommendations"
+Step 5: Return structured comprehensive report with: anatomical segmentation visualizations, complete list of detected abnormalities with precise locations and segmentations, classification diagnosis, and detailed clinical narrative integrating all findings
 </plan>
 '''

@@ -69,7 +69,7 @@ class MedMARS:
 
         # Generate answer and explanation from output
         print("Generating answer...")
-        response = self.reporter(query, out, self.plan) if out else {
+        response = self.reporter(query, out, self.code) if out else {
             "answer": "Error in execution",
             "explanation": str(result),
             "report": str(result)  # Backward compatibility

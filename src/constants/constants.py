@@ -1,6 +1,16 @@
 CHESTMNIST_LABEL = [
-       "atelectasis", "cardiomegaly", "effusion", "infiltration",
-       "mass", "nodule", "pneumonia", "pneumothorax",
-       "consolidation", "edema", "emphysema", "fibrosis",
-       "pleural", "hernia"
-   ]
+    "Aortic enlargement",
+    "Pleural thickening",
+    "Pleural effusion",
+    "Cardiomegaly",
+    "Lung Opacity",
+    "Nodule/Mass",
+    "Consolidation",
+    "Pulmonary fibrosis",
+    "Infiltration",
+    "Atelectasis",
+    "Other lesion",
+    "ILD",
+    "Pneumothorax",
+    "Calcification",
+]

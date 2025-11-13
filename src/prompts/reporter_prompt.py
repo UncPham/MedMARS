@@ -3,7 +3,7 @@ REPORTER_PROMPT = '''
 
 **User Question**: {query}
 
-**Analysis Plan**: {plan}
+**Analysis Plan**: {code}
 
 **Analysis Results**: {output}
 

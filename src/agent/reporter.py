@@ -35,11 +35,11 @@ class Reporter:
         else:
             raise ValueError(f"Unsupported model provider: {model_provider}. Use 'openai' or 'gemini'.")
 
-    def __call__(self, query: str, output: str, plan: str) -> dict:
+    def __call__(self, query: str, output: str, code: str) -> dict:
         if self.model_provider == "openai":
-            content = self._call_openai(query, output, plan)
+            content = self._call_openai(query, output, code)
         elif self.model_provider == "gemini":
-            content = self._call_gemini(query, output, plan)
+            content = self._call_gemini(query, output, code)
         else:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
 
@@ -63,12 +63,12 @@ class Reporter:
             "report": content  # Full content for backward compatibility
         }
 
-    def _call_openai(self, query: str, output: str, plan: str) -> str:
+    def _call_openai(self, query: str, output: str, code: str) -> str:
         """Call Azure OpenAI API"""
         # Format the prompt with query, plan, and output
         formatted_prompt = REPORTER_PROMPT.format(
             query=query,
-            plan=plan,
+            code=code,
             output=output
         )
 
@@ -88,12 +88,12 @@ class Reporter:
 
         return response.choices[0].message.content
 
-    def _call_gemini(self, query: str, output: str, plan: str) -> str:
+    def _call_gemini(self, query: str, output: str, code: str) -> str:
         """Call Google Gemini API"""
         # Format the prompt with query, plan, and output
         formatted_prompt = REPORTER_PROMPT.format(
             query=query,
-            plan=plan,
+            code=code,
             output=output
         )
 

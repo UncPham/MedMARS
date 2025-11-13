@@ -53,10 +53,12 @@ class ImagePatch:
     def classification_chest(self, image_path: str):
         outputs = self.biomedclip_model([image_path], CHESTMNIST_LABEL)
         label_scores = outputs[image_path.split('/')[-1]]
-        best_label = max(label_scores.items(), key=lambda x: x[1])
-        if best_label[1] > 0.4:
-            return best_label[0]
-        return None
+
+        # Get all labels with confidence > 0.4
+        detected_labels = [label for label, score in label_scores.items() if score > 0.4]
+
+        # Return list of detected labels, or None if nothing detected
+        return detected_labels if detected_labels else None
     
     def verify_property(self, list_image_path: list[str], query: str):
         outputs = self.explainer(query, list_image_path)
@@ -112,7 +114,8 @@ if __name__ == "__main__":
     sample_image_path = "/Users/uncpham/Repo/Medical-Assistant/src/data/vindr_cxr_vqa/images/0a1aef5326b7b24378c6692f7a454e52.jpg"
 
     # Option 1: Just detect abnormalities
-    results = model.detect_chest_abnormality(sample_image_path)
+    # results = model.detect_chest_abnormality(sample_image_path)
+    results = model.best_image_match(sample_image_path, "Cardiomegaly")
 
     print(f"results: {results}")
 
