@@ -4,9 +4,15 @@ import cv2
 import torch
 import shutil
 
-# Add paths to sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-sys.path.append(os.path.join(os.path.dirname(__file__), "Chest_x_ray_HybridGNet_Segmentation"))
+# Add paths to sys.path - IMPORTANT: insert at beginning to take priority
+hybridgnet_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "Chest_x_ray_HybridGNet_Segmentation"))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+# Insert Chest_x_ray_HybridGNet_Segmentation first so its utils module takes priority
+if hybridgnet_path not in sys.path:
+    sys.path.insert(0, hybridgnet_path)
+if project_root not in sys.path:
+    sys.path.insert(1, project_root)
 
 from src.vision_models.Chest_x_ray_HybridGNet_Segmentation.app import loadModel, segment
 from src.constants.env import STATIC_FOLDER
@@ -25,19 +31,6 @@ class CXRHybridGNetSegmentationModel(BaseModel):
         self.output_dir = output_dir if output_dir is not None else STATIC_FOLDER
 
     def __call__(self, image_path: str):
-        """
-        Perform segmentation on a chest X-ray image and save results.
-
-        Args:
-            image_path: Path to the input chest X-ray image
-
-        Returns:
-            dict: Dictionary containing paths to saved images:
-                - 'overlay_path': Path to the segmentation overlay image
-                - 'RL_mask_path': Path to the right lung mask image
-                - 'LL_mask_path': Path to the left lung mask image
-                - 'H_mask_path': Path to the heart mask image
-        """
         # Perform segmentation - returns (outseg, file_list)
         # The segment function saves files to tmp/ directory
         outseg, file_list = segment(image_path)

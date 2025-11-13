@@ -6,8 +6,14 @@ Provides a clean interface for using DEIM models
 import os
 import sys
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'DEIM'))
+# Add vision_models directory to path so DEIM can be imported as a package
+vision_models_dir = os.path.abspath(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+
+if vision_models_dir not in sys.path:
+    sys.path.insert(0, vision_models_dir)
+if project_root not in sys.path:
+    sys.path.insert(1, project_root)
 
 # Set environment variables for single-GPU/CPU mode (no distributed training)
 os.environ.setdefault('RANK', '0')
@@ -26,7 +32,7 @@ import colorsys
 # Import DEIM modules
 from DEIM.engine.core import YAMLConfig
 from src.vision_models.base_model import BaseModel
-from src.constants.env import DEIM_CHECKPOINT
+from src.constants.env import DEIM_CHECKPOINT, DEIM_CONFIG
 from src.constants.env import STATIC_FOLDER
 
 
@@ -141,8 +147,8 @@ class DEIMModel(BaseModel):
 
     def __init__(
         self,
-        config_path: str,
-        checkpoint_path: str,
+        config_path: str = DEIM_CONFIG,
+        checkpoint_path: str = DEIM_CHECKPOINT,
         output_dir: str = STATIC_FOLDER,
         device: Optional[str] = None,
         input_size: int = 640
@@ -562,13 +568,7 @@ if __name__ == '__main__':
     print("DEIM Model Example Usage")
     print("=" * 60)
 
-    # Initialize model
-    config_path = '/Users/uncpham/Repo/Medical-Assistant/src/vision_models/DEIM/configs/deim_dfine/deim_hgnetv2_x_vinbigdata_v3_simple.yml'
-    checkpoint_path = DEIM_CHECKPOINT
-
     model = DEIMModel(
-        config_path=config_path,
-        checkpoint_path=checkpoint_path,
         input_size=640
     )
 

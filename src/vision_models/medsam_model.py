@@ -20,7 +20,7 @@ class MedSAMModel(BaseModel):
         self.load_model()
         self.output_dir = output_dir if output_dir is not None else STATIC_FOLDER
 
-    def __call__(self, image_path: str, boxes: List[float]):
+    def __call__(self, image_path: str, boxes: List[float], label: str = ""):
         raw_image = Image.open(image_path).convert("RGB")
         # Format boxes as required: [[[x1, y1, x2, y2]]]
         formatted_boxes = [[boxes]]
@@ -46,7 +46,10 @@ class MedSAMModel(BaseModel):
         base_filename = os.path.splitext(os.path.basename(image_path))[0]
 
         # Save mask
-        mask_filename = f'{base_filename}_medsam_mask.png'
+        if label:
+            mask_filename = f'{base_filename}_medsam_{label}_mask.png'
+        else:   
+            mask_filename = f'{base_filename}_medsam_mask.png'
         mask_path = os.path.join(self.output_dir, mask_filename)
         cv2.imwrite(mask_path, mask)
 
@@ -59,7 +62,10 @@ class MedSAMModel(BaseModel):
         overlay[mask_bool] = overlay[mask_bool] * 0.5 + np.array([255, 255, 0]) * 0.5
 
         # Save overlay
-        overlay_filename = f'{base_filename}_medsam_overlay.png'
+        if label:
+            overlay_filename = f'{base_filename}_medsam_{label}_overlay.png'
+        else:   
+            overlay_filename = f'{base_filename}_medsam_overlay.png'
         overlay_path = os.path.join(self.output_dir, overlay_filename)
         cv2.imwrite(overlay_path, cv2.cvtColor(overlay.astype(np.uint8), cv2.COLOR_RGB2BGR))
 
