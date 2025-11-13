@@ -22,12 +22,6 @@ from src.prompts.explainer_prompt import EXPLAINER_PROMPT
 
 class Explainer:
     def __init__(self, model_provider: str = "openai"):
-        """
-        Initialize Explainer with specified model provider.
-
-        Args:
-            model_provider: Either "openai" or "gemini"
-        """
         self.model_provider = model_provider.lower()
 
         if self.model_provider == "openai":
@@ -51,16 +45,6 @@ class Explainer:
             return base64.b64encode(image_file.read()).decode("utf-8")
 
     def __call__(self, query: str, list_image: list = None) -> str:
-        """
-        Generate explanation based on query and images.
-
-        Args:
-            query: The user's question
-            list_image: Optional list of image paths
-
-        Returns:
-            Explanation text
-        """
         if self.model_provider == "openai":
             return self._call_openai(query, list_image)
         elif self.model_provider == "gemini":

@@ -18,18 +18,7 @@ from src.prompts.reporter_prompt import REPORTER_PROMPT
 
 
 class Reporter:
-    """
-    Agent responsible for generating comprehensive medical reports from vision model outputs.
-    Uses Azure OpenAI or Google Gemini to create detailed, patient-friendly explanations with visual evidence.
-    """
-
     def __init__(self, model_provider: str = "openai"):
-        """
-        Initialize Reporter with specified model provider.
-
-        Args:
-            model_provider: Either "openai" or "gemini"
-        """
         self.model_provider = model_provider.lower()
 
         if self.model_provider == "openai":
@@ -47,17 +36,6 @@ class Reporter:
             raise ValueError(f"Unsupported model provider: {model_provider}. Use 'openai' or 'gemini'.")
 
     def __call__(self, query: str, output: str, plan: str) -> dict:
-        """
-        Generate a comprehensive medical report.
-
-        Args:
-            query: The user's medical question
-            output: The results from the execute code
-            plan: The analysis plan that was executed
-
-        Returns:
-            dict with 'answer' and 'explanation' keys
-        """
         if self.model_provider == "openai":
             content = self._call_openai(query, output, plan)
         elif self.model_provider == "gemini":

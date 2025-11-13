@@ -44,17 +44,6 @@ class PlannerModel:
             return base64.b64encode(image_file.read()).decode("utf-8")
 
     def __call__(self, query: str, image_path: str = None, planning: str = ""):
-        """
-        Generate an analysis plan based on the user's medical query and optional image.
-
-        Args:
-            query: The user's medical imaging question
-            image_path: Optional path to the medical image
-            planning: Previous planning context (optional)
-
-        Returns:
-            Step-by-step analysis plan
-        """
         if self.model_provider == "openai":
             content = self._call_openai(query, image_path, planning)
         elif self.model_provider == "gemini":

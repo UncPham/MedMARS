@@ -19,12 +19,6 @@ from src.prompts.code_prompt import CODER_PROMPT, EXAMPLES_CODER
 
 class CoderModel:
     def __init__(self, model_provider: str = "openai"):
-        """
-        Initialize CoderModel with specified model provider.
-
-        Args:
-            model_provider: Either "openai" or "gemini"
-        """
         self.model_provider = model_provider.lower()
 
         if self.model_provider == "openai":
@@ -42,14 +36,6 @@ class CoderModel:
             raise ValueError(f"Unsupported model provider: {model_provider}. Use 'openai' or 'gemini'.")
 
     def __call__(self, plan: str):
-        """
-        Generate code based on plan.
-
-        Args:
-            plan: The coding plan or task
-        Returns:
-            Generated code or explanation
-        """
         if self.model_provider == "openai":
             return self._call_openai(plan)
         elif self.model_provider == "gemini":
