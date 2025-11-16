@@ -16,12 +16,13 @@ from src.constants.env import (
     AZURE_OPENAI_ENDPOINT,
     GEMINI_API_KEY,
     GEMINI_MODEL,
+    LLM_MODEL
 )
 from src.prompts.explainer_prompt import EXPLAINER_PROMPT
 
 
 class Explainer:
-    def __init__(self, model_provider: str = "openai"):
+    def __init__(self, model_provider: str = LLM_MODEL):
         self.model_provider = model_provider.lower()
 
         if self.model_provider == "openai":
@@ -128,8 +129,27 @@ class Explainer:
             content_parts,
             generation_config=genai.types.GenerationConfig(
                 temperature=0.3,
-                max_output_tokens=2000,
+                max_output_tokens=4000,
             )
         )
 
-        return response.text
+        # Handle response safely
+        if not response.candidates:
+            raise ValueError("No response candidates returned from Gemini API")
+
+        candidate = response.candidates[0]
+
+        # Check finish reason
+        if candidate.finish_reason == 1:  # STOP - normal completion
+            return response.text
+        elif candidate.finish_reason == 2:  # MAX_TOKENS
+            # Try to return partial response if available
+            if candidate.content and candidate.content.parts:
+                return candidate.content.parts[0].text
+            raise ValueError("Response exceeded max tokens. Try increasing max_output_tokens.")
+        elif candidate.finish_reason == 3:  # SAFETY
+            raise ValueError("Response blocked by safety filters")
+        elif candidate.finish_reason == 4:  # RECITATION
+            raise ValueError("Response blocked due to recitation")
+        else:
+            raise ValueError(f"Unexpected finish_reason: {candidate.finish_reason}")

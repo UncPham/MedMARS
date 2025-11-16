@@ -52,7 +52,10 @@ class ImagePatch:
 
     def classification_chest(self, image_path: str):
         outputs = self.biomedclip_model([image_path], CHESTMNIST_LABEL)
-        label_scores = outputs[image_path.split('/')[-1]]
+        # BioMedClip returns dict with key format: "image_{filename}"
+        filename = image_path.split('/')[-1]
+        key = f"image_{filename}"
+        label_scores = outputs[key]
 
         # Get all labels with confidence > 0.4
         detected_labels = [label for label, score in label_scores.items() if score > 0.4]
