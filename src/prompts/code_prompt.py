@@ -256,9 +256,12 @@ def execute_command(image_path):
     # Step 4: Detailed clinical analysis if pneumonia indicators found
     detailed_analysis = None
     if has_pneumonia:
-        # Collect all visual evidence: original + detection overlays + segmentation masks
+        # Collect all visual evidence: original image + detection overlays (with bboxes) + segmentation overlays (individual masks on image)
         overlay_images = [image_path] + list(detection_result['detection']['overlay_paths'].values())
-        
+
+        # Add individual segmentation overlays (each abnormality's mask overlaid on original image)
+        overlay_images.extend([seg['overlay_path'] for seg in detection_result['segmentations']])
+
         detailed_analysis = image_patch.verify_property(
             overlay_images,
             f"Describe the pneumonia signs including anatomical location, extent of involvement, pattern (lobar vs diffuse), and severity assessment. Detected conditions: {{', '.join(diagnoses)}}. Focus on: {{', '.join(detection_result['detection']['label_names'])}}"
@@ -310,14 +313,19 @@ def execute_command(image_path):
 
     # Step 4: Clinical assessment with all visual evidence
     overlay_images = [image_path]
-    
-    # Add cardiomegaly detection overlay if present
+
+    # Add cardiomegaly detection overlay if present (bbox drawn on image)
     if detection_result['detection']['overlay_paths'] and 'Cardiomegaly' in detection_result['detection']['overlay_paths']:
         overlay_images.append(detection_result['detection']['overlay_paths']['Cardiomegaly'])
-    
-    # Add heart segmentation mask
-    overlay_images.extend([segmentation['overlay_path']])
-    
+
+    # Add anatomical segmentation overlay (lungs/heart segmented on image)
+    overlay_images.append(segmentation['overlay_path'])
+
+    # Add individual abnormality segmentation overlays if any
+    for seg in detection_result['segmentations']:
+        if seg['abnormality'] == 'Cardiomegaly':
+            overlay_images.append(seg['overlay_path'])
+
     assessment = image_patch.verify_property(
         overlay_images,
         f"Evaluate the heart size and calculate the cardiothoracic ratio. Is the heart enlarged? Explain the findings with reference to normal values (CTR < 0.5). Detected conditions: {{diagnoses if diagnoses else 'None'}}."
@@ -346,7 +354,7 @@ Plan:
 Step 1: Use segment_lungs_heart(image_path) for anatomical segmentation - Returns lung and heart masks (establishes anatomical baseline)
 Step 2: Use detect_chest_abnormality(image_path) to detect and segment any abnormalities - Returns detection with bboxes and segmentation masks for each abnormality (identifies all pathological findings)
 Step 3: Use classification_chest(image_path) to identify primary disease/condition - Returns disease label or None (provides overall diagnostic impression)
-Step 4: Use verify_property with comprehensive visual evidence (original image, anatomical segmentation overlay, all detection overlays, individual abnormality masks) to generate detailed radiological report: "Provide comprehensive chest X-ray analysis including: 1) Technical quality, 2) Anatomical structures assessment, 3) All detected abnormalities with locations and characteristics, 4) Primary diagnosis, 5) Clinical significance and recommendations"
+Step 4: Use verify_property with comprehensive visual evidence (original image, anatomical segmentation overlay, all detection overlays) to generate detailed radiological report: "Provide comprehensive chest X-ray analysis including: 1) Technical quality, 2) Anatomical structures assessment, 3) All detected abnormalities with locations and characteristics, 4) Primary diagnosis, 5) Clinical significance and recommendations"
 Step 5: Return structured comprehensive report with: anatomical segmentation visualizations, complete list of detected abnormalities with precise locations and segmentations, classification diagnosis, and detailed clinical narrative integrating all findings
 
 A:
@@ -364,10 +372,13 @@ def execute_command(image_path):
 
     # Step 4: Comprehensive analysis with all visual evidence
     overlay_images = [image_path, segmentation['overlay_path']]
-    
-    # Add all detection overlays
+
+    # Add all detection overlays (bboxes drawn on image)
     overlay_images.extend(list(detection_result['detection']['overlay_paths'].values()))
-    
+
+    # Add individual abnormality segmentation overlays (each abnormality's mask on image)
+    overlay_images.extend([seg['overlay_path'] for seg in detection_result['segmentations']])
+
     findings_text = f"Detected conditions: {{', '.join(diagnoses)}}" if diagnoses else "No specific abnormalities detected"
     comprehensive_analysis = image_patch.verify_property(
         overlay_images,
