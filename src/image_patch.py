@@ -22,6 +22,8 @@ if vision_models_dir not in sys.path:
 if hybridgnet_path not in sys.path:
     sys.path.insert(0, hybridgnet_path)
 
+from collections import defaultdict
+
 from src.vision_models.biomedclip_model import BioMedClipModel
 from src.vision_models.medsam_model import MedSAMModel
 from src.vision_models.cxr_hybridgnet_segmentation_model import CXRHybridGNetSegmentationModel
@@ -81,24 +83,29 @@ class ImagePatch:
                 'segmentation': []
             }
 
-        # Segment each detected abnormality
-        segmentations = []
+        # Group boxes by class (label_name)
+        boxes_by_class = defaultdict(list)
+
         for box, label_name, score in zip(
             deim_results['boxes'],
             deim_results['label_names'],
             deim_results['scores']
         ):
-            # Convert box to list format [x1, y1, x2, y2]
             box_list = box.tolist()
-            print(f"Segmenting {label_name} with box {box_list}...")
+            boxes_by_class[label_name].append(box_list)
 
-            # Run MedSAM segmentation
+        # Segment each class (with all its boxes at once)
+        segmentations = []
+        for label_name, box_list_group in boxes_by_class.items():
+            print(f"Segmenting {label_name} with {len(box_list_group)} box(es): {box_list_group}...")
+
+            # Run MedSAM segmentation with all boxes of this class
             label = label_name.replace(" ", "_").lower()
-            seg_result = self.medsam_model(image_path, box_list, label=label)
+            seg_result = self.medsam_model(image_path, box_list_group, label=label)
 
             # Add metadata
             seg_result['abnormality'] = label_name
-            seg_result['box'] = box_list
+            seg_result['boxes'] = box_list_group  # Store all boxes for this class
 
             segmentations.append(seg_result)
 
@@ -117,8 +124,8 @@ if __name__ == "__main__":
     sample_image_path = "/Users/uncpham/Repo/Medical-Assistant/src/data/vindr_cxr_vqa/images/0a1aef5326b7b24378c6692f7a454e52.jpg"
 
     # Option 1: Just detect abnormalities
-    # results = model.detect_chest_abnormality(sample_image_path)
-    results = model.best_image_match(sample_image_path, "Cardiomegaly")
+    results = model.detect_chest_abnormality(sample_image_path)
+    # results = model.best_image_match(sample_image_path, "Cardiomegaly")
 
     print(f"results: {results}")
 

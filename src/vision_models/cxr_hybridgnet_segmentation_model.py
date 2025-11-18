@@ -39,31 +39,31 @@ class CXRHybridGNetSegmentationModel(BaseModel):
         os.makedirs(self.output_dir, exist_ok=True)
 
         # Get base filename from input image
-        base_filename = os.path.splitext(os.path.basename(image_path))[0]
+        # base_filename = os.path.splitext(os.path.basename(image_path))[0]
 
         # Get path to tmp directory
         hybridgnet_dir = os.path.join(os.path.dirname(__file__), "Chest_x_ray_HybridGNet_Segmentation")
         tmp_dir = os.path.join(hybridgnet_dir, "tmp")
 
         # Copy files from tmp directory to output directory with new names
-        overlay_filename = f'{base_filename}_segmentation_lungs_heart_overlay.png'
+        overlay_filename = f'segmentation_lungs_heart_overlay.png'
         overlay_path = os.path.join(self.output_dir, overlay_filename)
         shutil.copy(os.path.join(tmp_dir, "overlap_segmentation.png"), overlay_path)
 
-        rl_mask_path = os.path.join(self.output_dir, f'{base_filename}_RL_mask.png')
-        ll_mask_path = os.path.join(self.output_dir, f'{base_filename}_LL_mask.png')
-        h_mask_path = os.path.join(self.output_dir, f'{base_filename}_H_mask.png')
+        rl_mask_path = os.path.join(self.output_dir, f'RL_mask.png')
+        ll_mask_path = os.path.join(self.output_dir, f'LL_mask.png')
+        h_mask_path = os.path.join(self.output_dir, f'H_mask.png')
 
         shutil.copy(os.path.join(tmp_dir, "RL_mask.png"), rl_mask_path)
         shutil.copy(os.path.join(tmp_dir, "LL_mask.png"), ll_mask_path)
         shutil.copy(os.path.join(tmp_dir, "H_mask.png"), h_mask_path)
 
-        # Return only the paths
+        # Return only the filenames (not full paths)
         result = {
-            'overlay_path': overlay_path,
-            'RL_mask_path': rl_mask_path,
-            'LL_mask_path': ll_mask_path,
-            'H_mask_path': h_mask_path
+            'overlay_path': os.path.basename(overlay_path),
+            'RL_mask_path': os.path.basename(rl_mask_path),
+            'LL_mask_path': os.path.basename(ll_mask_path),
+            'H_mask_path': os.path.basename(h_mask_path)
         }
 
         return result

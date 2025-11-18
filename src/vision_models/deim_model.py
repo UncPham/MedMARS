@@ -366,8 +366,8 @@ class DEIMModel(BaseModel):
             results=results,
             output_dir=self.output_dir
         )
-        # Add overlay paths to results
-        results['overlay_paths'] = {class_name: data['path'] for class_name, data in layer_results.items()}
+        # Add overlay paths to results (only filenames, not full paths)
+        results['overlay_paths'] = {class_name: os.path.basename(data['path']) for class_name, data in layer_results.items()}
 
         return results
 
@@ -523,7 +523,7 @@ class DEIMModel(BaseModel):
         for class_name, overlay in layer_overlays.items():
             # Create safe filename
             safe_name = class_name.replace('/', '_').replace(' ', '_')
-            output_path = output_dir / f"overlay_{safe_name}.png"
+            output_path = output_dir / f"overlay_bbox_{safe_name}.png"
             self.save_overlay(overlay, output_path)
             saved_paths[class_name] = str(output_path)
 

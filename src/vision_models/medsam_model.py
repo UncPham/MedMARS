@@ -23,7 +23,14 @@ class MedSAMModel(BaseModel):
     def __call__(self, image_path: str, boxes: List[float], label: str = ""):
         raw_image = Image.open(image_path).convert("RGB")
         # Format boxes as required: [[[x1, y1, x2, y2]]]
-        formatted_boxes = [[boxes]]
+        # formatted_boxes = [[boxes]]
+        # Handle both single box and multiple boxes
+        if isinstance(boxes[0], (int, float)):
+            # Single box: [x1, y1, x2, y2] -> [[[x1, y1, x2, y2]]]
+            formatted_boxes = [[boxes]]
+        else:
+            # Multiple boxes: [[x1,y1,x2,y2], ...] -> [[[x1,y1,x2,y2], [x1,y1,x2,y2], ...]]
+            formatted_boxes = [boxes]
         inputs = self.processor(raw_image, input_boxes=formatted_boxes, return_tensors="pt").to(
             self.device
         )
@@ -37,19 +44,29 @@ class MedSAMModel(BaseModel):
         )
 
         # Get the mask (threshold at 0.5)
-        mask = (probs[0] > 0.5).squeeze().numpy().astype(np.uint8) * 255
+        # probs[0] shape: (num_boxes, 1, H, W) for multiple boxes or (1, H, W) for single box
+        mask_raw = (probs[0] > 0.5).squeeze().numpy()  # Remove singleton dims
+
+        # Handle both single box and multiple boxes
+        if mask_raw.ndim == 3:  # Multiple boxes: (num_boxes, H, W)
+            # Combine masks with OR operation (any box predicts positive = True)
+            mask = (mask_raw.any(axis=0)).astype(np.uint8) * 255  # (H, W)
+        elif mask_raw.ndim == 2:  # Single box: (H, W)
+            mask = mask_raw.astype(np.uint8) * 255
+        else:
+            raise ValueError(f"Unexpected mask shape: {mask_raw.shape}")
 
         # Create output directory if it doesn't exist
         os.makedirs(self.output_dir, exist_ok=True)
 
         # Get base filename from input image
-        base_filename = os.path.splitext(os.path.basename(image_path))[0]
+        # base_filename = os.path.splitext(os.path.basename(image_path))[0]
 
         # Save mask
         if label:
-            mask_filename = f'{base_filename}_medsam_{label}_mask.png'
+            mask_filename = f'medsam_{label}_mask.png'
         else:   
-            mask_filename = f'{base_filename}_medsam_mask.png'
+            mask_filename = f'medsam_mask.png'
         mask_path = os.path.join(self.output_dir, mask_filename)
         cv2.imwrite(mask_path, mask)
 
@@ -63,15 +80,15 @@ class MedSAMModel(BaseModel):
 
         # Save overlay
         if label:
-            overlay_filename = f'{base_filename}_medsam_{label}_overlay.png'
+            overlay_filename = f'medsam_{label}_overlay.png'
         else:   
-            overlay_filename = f'{base_filename}_medsam_overlay.png'
+            overlay_filename = f'medsam_overlay.png'
         overlay_path = os.path.join(self.output_dir, overlay_filename)
         cv2.imwrite(overlay_path, cv2.cvtColor(overlay.astype(np.uint8), cv2.COLOR_RGB2BGR))
 
         return {
-            'mask_path': mask_path,
-            'overlay_path': overlay_path
+            'mask_path': os.path.basename(mask_path),
+            'overlay_path': os.path.basename(overlay_path)
         }
 
     @staticmethod
@@ -98,7 +115,7 @@ if __name__ == "__main__":
     image_path = (
         "/Users/uncpham/Repo/Medical-Assistant/src/data/vqa_rad/images/img_0.jpg"
     )
-    input_boxes = [95.0, 255.0, 190.0, 350.0]
+    input_boxes = [[95.0, 255.0, 190.0, 350.0], [220.0, 100.0, 320.0, 200.0]]
 
     result = model(image_path, input_boxes)
     print(f"Mask path: {result['mask_path']}")
