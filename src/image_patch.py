@@ -59,11 +59,10 @@ class ImagePatch:
         key = f"image_{filename}"
         label_scores = outputs[key]
 
-        # Get all labels with confidence > 0.4
-        detected_labels = [label for label, score in label_scores.items() if score > 0.4]
+        detected_labels = {label: score for label, score in label_scores.items()}
 
         # Return list of detected labels, or None if nothing detected
-        return detected_labels if detected_labels else None
+        return detected_labels
     
     def verify_property(self, list_image_path: list[str], query: str):
         outputs = self.explainer(query, list_image_path)
@@ -80,7 +79,7 @@ class ImagePatch:
         if len(deim_results['boxes']) == 0:
             return {
                 'detection': deim_results,
-                'segmentation': []
+                'segmentations': []  # Consistent key name with non-empty case
             }
 
         # Group boxes by class (label_name)
@@ -125,7 +124,7 @@ if __name__ == "__main__":
 
     # Option 1: Just detect abnormalities
     results = model.detect_chest_abnormality(sample_image_path)
-    # results = model.best_image_match(sample_image_path, "Cardiomegaly")
+    # results = model.classification_chest(sample_image_path)
 
     print(f"results: {results}")
 

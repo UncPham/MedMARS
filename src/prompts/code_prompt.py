@@ -6,7 +6,7 @@ CODER_PROMPT='''
 2. Your primary responsibility is to translate instructions into Python code that implements the plan
 3. You can use base Python (comparison, conditional logic, loops) for control flow
 4. Always handle cases where methods return None or unexpected results
-5. ONLY output the execute_command function. Do not include any explanations, comments outside the function, or additional text
+5. ONLY output the execute_command function. Do not include any explanations, comments outside the function, additional text or ```python``` blocks
 
 **Provided Python Class:**
 
@@ -15,21 +15,19 @@ class ImagePatch:
 
     Methods
     -------
-    classification_chest(image_path: str) → list[str] or None
+    classification_chest(image_path: str) → dict
         Classifies chest X-ray images into disease categories from ChestMNIST dataset.
 
         Returns:
-            list[str]: List of all detected disease labels with confidence > 0.4
-            None: If no disease detected with sufficient confidence
+            dict: {{label: confidence_score}} for ALL 14 disease categories (scores 0.0-1.0)
+            Example: {{"Cardiomegaly": 0.85, "Pleural effusion": 0.12, "Infiltration": 0.03, ...}}
 
-        Can detect multiple conditions simultaneously in the same image.
+        Always returns confidence scores for ALL categories. Use threshold (e.g., > 0.05) to filter.
 
         Available labels: "Aortic enlargement", "Pleural thickening", "Pleural effusion",
         "Cardiomegaly", "Lung Opacity", "Nodule/Mass", "Consolidation",
         "Pulmonary fibrosis", "Infiltration", "Atelectasis", "Other lesion",
         "ILD", "Pneumothorax", "Calcification"
-
-        Example: ["Cardiomegaly", "Pleural effusion"] or ["Infiltration"] or None
 
     best_image_match(images_path: list[str], labels: list[str]) → dict
         Matches multiple images to multiple labels with confidence scores.
@@ -46,10 +44,6 @@ class ImagePatch:
                 ...
             }}
 
-        Example:
-            Input: images=['img1.jpg'], labels=['chest X-ray', 'brain MRI']
-            Output: {{'img1.jpg': {{'chest X-ray': 99.5, 'brain MRI': 0.5}}}}
-
     segment_lungs_heart(image_path: str) → dict
         Segments lungs and heart in chest X-ray images.
 
@@ -61,16 +55,10 @@ class ImagePatch:
                 'H_mask_path': str     # Heart segmentation mask
             }}
 
-        Example: {{
-            'overlay_path': '/path/to/chest_overlay.png',
-            'RL_mask_path': '/path/to/right_lung.png',
-            'LL_mask_path': '/path/to/left_lung.png',
-            'H_mask_path': '/path/to/heart.png'
-        }}
-
     detect_chest_abnormality(image_path: str) → dict
         Detects and segments chest abnormalities (lesions, nodules, infiltrates, etc.).
         Uses DEIM for detection + MedSAM for precise segmentation of each abnormality.
+        Boxes are grouped by class - if same class has multiple detections, all boxes are passed to MedSAM together.
 
         Returns:
             dict: {{
@@ -86,7 +74,7 @@ class ImagePatch:
                         'mask_path': '/path/to/mask.png',
                         'overlay_path': '/path/to/overlay.png',
                         'abnormality': 'Aortic enlargement',
-                        'box': [x1, y1, x2, y2]
+                        'boxes': [[x1, y1, x2, y2], ...]  # All boxes for this abnormality class
                     }},
                     ...
                 ]
@@ -116,20 +104,15 @@ class ImagePatch:
         - Multi-image analysis: Analyze original + processed images together
     """
 
-    def classification_chest(self, image_path: str) -> list:
+    def classification_chest(self, image_path: str) -> dict:
         """
         Example:
-        >>> diagnoses = image_patch.classification_chest("chest_xray.png")
-        >>> # Returns: ["Infiltration", "Pleural effusion"] or ["Cardiomegaly"] or None if confidence < 0.4
-        >>> # Can detect multiple conditions in same image
-        """
-        pass
-
-    def classification_organa(self, image_path: str) -> str:
-        """
-        Example:
-        >>> organ = image_patch.classification_organa("organ_scan.png")
-        >>> # Returns: organ label or None if confidence < 0.4
+        >>> scores = image_patch.classification_chest("chest_xray.png")
+        >>> # Returns: {{"Cardiomegaly": 0.85, "Pleural effusion": 0.12, "Infiltration": 0.03, ...}}
+        >>> # Get diseases with confidence > 0.05
+        >>> detected = {{disease: conf for disease, conf in scores.items() if conf > 0.05}}
+        >>> # Get main disease
+        >>> main = max(scores, key=scores.get)
         """
         pass
 
@@ -163,38 +146,12 @@ class ImagePatch:
 
     def detect_chest_abnormality(self, image_path: str) -> dict:
         """
-        Detects and segments chest abnormalities using DEIM + MedSAM models.
-
-        Returns:
-            dict: {{
-                'detection': {{
-                    'boxes': numpy array of bounding boxes [x1, y1, x2, y2],
-                    'scores': confidence scores (0-1),
-                    'labels': numeric labels,
-                    'label_names': list of abnormality names,
-                    'overlay_paths': {{class_name: overlay_image_path}}
-                }},
-                'segmentations': [
-                    {{
-                        'mask_path': str,
-                        'overlay_path': str,
-                        'abnormality': str,
-                        'box': [x1, y1, x2, y2]
-                    }},
-                    ...
-                ]
-            }}
-
-        Detected categories: Aortic enlargement, Pleural thickening, Pleural effusion,
-        Cardiomegaly, Lung Opacity, Nodule/Mass, Consolidation, Pulmonary fibrosis,
-        Infiltration, Atelectasis, Other lesion, ILD, Pneumothorax, Calcification
-
         Example:
         >>> result = image_patch.detect_chest_abnormality("chest_xray.png")
         >>> # Returns detection with bounding boxes + precise segmentation for each abnormality
         >>> num_abnormalities = len(result['detection']['boxes'])
         >>> for seg in result['segmentations']:
-        ...     print(f"Found {{seg['abnormality']}} at {{seg['box']}}")
+        ...     print(f"Found {{seg['abnormality']}} at {{(seg['boxes'])}}")
         """
         pass
 
@@ -226,191 +183,117 @@ def execute_command(image_path):
 '''
 
 EXAMPLES_CODER = '''
-### Example 1: Chest X-Ray Disease Classification
+### Example 1: Specific Disease Question
 Plan:
-Step 1: Use classification_chest(image_path) to classify the chest X-ray - Returns disease label or None (establishes primary diagnosis)
-Step 2: Use detect_chest_abnormality(image_path) to detect infiltration, consolidation, or lung opacity - Returns detection with bboxes and segmentation masks (provides anatomical evidence)
-Step 3: Cross-validate results: check if classification indicates "pneumonia" AND detection found pneumonia-related abnormalities (infiltration/consolidation/lung opacity)
-Step 4: If pneumonia indicators found, use verify_property with all images (original, detection overlays with bboxes, abnormality segmentation masks) to provide detailed clinical analysis: "Describe the pneumonia signs including anatomical location, extent of involvement, pattern (lobar vs diffuse), and severity assessment"
-Step 5: Return comprehensive answer: "Yes/No pneumonia detected" with classification result, detected abnormalities with precise locations, segmentation visualizations, and detailed clinical assessment with recommendations
+Step 1: best_image_match([image_path], ["Cardiomegaly"]) - Check cardiomegaly confidence
+Step 2: detect_chest_abnormality(image_path) - Grounding heart region with bbox
+Step 3: segment_lungs_heart(image_path) - get heart and lung masks
+Step 4: Check logic: if (has heart bbox and cardiomegaly conf > 0.05) → Step 5, else → return No
+Step 5: verify_property([original, detection overlays, anatomical segmentation overlay], "Evaluate if the heart is enlarged: calculate cardiothoracic ratio from segmentation masks, compare heart size to thorax width, reference normal CTR < 0.5, explain findings")
+Step 6: Return answer with:
+   - Direct answer: Yes/No (based on conf > 0.05 and has bbox and CTR assessment)
+   - Raw outputs: best_image_match results {{"Cardiomegaly": confidence}}, detect_chest_abnormality (boxes, scores, label_names, overlay_paths, segmentations), segment_lungs_heart (overlay_path, H_mask_path, RL_mask_path, LL_mask_path)
+   - Clinical explanation: observed heart size → bbox location → CTR measurement → significance → conclusion
 
 A:
 def execute_command(image_path):
     image_patch = ImagePatch()
 
-    # Step 1: Classify chest X-ray - returns list of diseases or None
-    diagnoses = image_patch.classification_chest(image_path)
+    # Step 1: best_image_match([image_path], ["Cardiomegaly"]) - Check cardiomegaly confidence
+    cardiomegaly_classification = image_patch.best_image_match([image_path], ["Cardiomegaly"])
 
-    # Step 2: Detect abnormalities (infiltration, consolidation, lung opacity)
+    # Step 2: detect_chest_abnormality(image_path) - Grounding heart region with bbox
     detection_result = image_patch.detect_chest_abnormality(image_path)
 
-    # Step 3: Cross-validate - check if classification indicates pneumonia AND detection found related abnormalities
-    has_pneumonia = False
-    pneumonia_indicators = ['Infiltration', 'Consolidation', 'Lung Opacity']
-    
-    classification_has_pneumonia = diagnoses and any(indicator in diagnoses for indicator in pneumonia_indicators)
-    detection_has_pneumonia = any(abnorm in pneumonia_indicators for abnorm in detection_result['detection']['label_names'])
-    
-    has_pneumonia = classification_has_pneumonia and detection_has_pneumonia
+    # Step 3: segment_lungs_heart(image_path) - get heart and lung masks
+    segment_lungs_heart = image_patch.segment_lungs_heart(image_path)
 
-    # Step 4: Detailed clinical analysis if pneumonia indicators found
-    detailed_analysis = None
-    if has_pneumonia:
-        # Collect all visual evidence: original image + detection overlays (with bboxes) + segmentation overlays (individual masks on image)
-        overlay_images = [image_path] + list(detection_result['detection']['overlay_paths'].values())
+    # Step 4: Check logic: if (has heart bbox and cardiomegaly conf > 0.05) → Step 5, else → return No
+    is_cardiomegaly = False
+    verify_property_images = [image_path]
+    if cardiomegaly_classification['image_path']['Cardiomegaly'] > 0.05 and 'Cardiomegaly' in detection_result['detection']['label_names']:
+        is_cardiomegaly = True
+        verify_property_images.append(detection_result['detection']['overlay_paths']['Cardiomegaly'])
+        verify_property_images.append(segment_lungs_heart['overlay_path'])
 
-        # Add individual segmentation overlays (each abnormality's mask overlaid on original image)
-        overlay_images.extend([seg['overlay_path'] for seg in detection_result['segmentations']])
-
-        detailed_analysis = image_patch.verify_property(
-            overlay_images,
-            f"Describe the pneumonia signs including anatomical location, extent of involvement, pattern (lobar vs diffuse), and severity assessment. Detected conditions: {{', '.join(diagnoses)}}. Focus on: {{', '.join(detection_result['detection']['label_names'])}}"
+    # Step 5: verify_property - Clinical assessment with visual evidence
+    if is_cardiomegaly:
+        verification_result = image_patch.verify_property(
+            verify_property_images, 
+            "Analyze the heart size in this chest X-ray: 1) Calculate the cardiothoracic ratio (CTR) by measuring heart width and thorax width from the segmentation masks, 2) Compare the CTR to normal threshold (CTR < 0.5), 3) Describe the visual appearance of the heart borders and position, 4) Assess the degree of enlargement if present (mild/moderate/severe), 5) Identify which cardiac chambers appear enlarged based on the silhouette, 6) Provide clinical interpretation of the findings."
+        )
+    else:
+        verification_result = image_patch.verify_property(
+            [image_path], 
+            "Analyze the heart size in this chest X-ray. The heart appears normal based on automated assessment. Confirm by describing: 1) The appearance of the cardiac silhouette, 2) The estimated cardiothoracic ratio, 3) The position and borders of the heart, 4) Any other relevant cardiac features observed."
         )
 
-    # Step 5: Return comprehensive answer
+    
+    # Step 6: Return answer
     return {{
-        "pneumonia_detected": has_pneumonia,
-        "all_diagnoses": diagnoses if diagnoses else [],
-        "detected_abnormalities": detection_result['detection']['label_names'],
-        "detection_overlays": detection_result['detection']['overlay_paths'],
-        "segmentation_masks": [seg['mask_path'] for seg in detection_result['segmentations']],
-        "detailed_analysis": detailed_analysis,
-        "recommendation": "Urgent medical evaluation recommended" if has_pneumonia else "Continue monitoring"
+        "cardiomegaly_detected": is_cardiomegaly,
+        "best_image_match": cardiomegaly_classification,
+        "detection_result": detection_result,
+        "segmentation_result": segment_lungs_heart,
+        "clinical_explanation": verification_result
     }}
 
-### Example 2: Medical Knowledge Question
+### Example 2: General Diseases Question
 Plan:
-Step 1: Return definition: "Pneumonia is an infection of the lung tissue causing inflammation of the air sacs (alveoli), which fill with fluid or pus. Common symptoms include cough, fever, difficulty breathing, and chest pain. It can be caused by bacteria, viruses, or fungi."
-
-A:
-def execute_command(image_path=None):
-    return {{
-        "question": "What is pneumonia?",
-        "answer": "Pneumonia is an infection of the lung tissue causing inflammation of the air sacs (alveoli), which fill with fluid or pus. Common symptoms include cough, fever, difficulty breathing, and chest pain. It can be caused by bacteria, viruses, or fungi.",
-        "type": "medical_knowledge"
-    }}
-
-### Example 3: Property Verification
-Plan:
-Step 1: Use classification_chest(image_path) to check if "cardiomegaly" is detected - Returns disease label or None (initial screening)
-Step 2: Use detect_chest_abnormality(image_path) to detect cardiomegaly - Returns detection with precise bbox if present (confirms location and extent)
-Step 3: Use segment_lungs_heart(image_path) to segment heart and lung fields - Returns H_mask_path, RL_mask_path, LL_mask_path (enables cardiothoracic ratio measurement)
-Step 4: Use verify_property with all visual evidence (original image, cardiomegaly detection overlay if present, heart segmentation mask) to provide clinical assessment: "Evaluate the heart size and calculate the cardiothoracic ratio. Is the heart enlarged? Explain the findings with reference to normal values (CTR < 0.5)"
-Step 5: Return definitive yes/no answer with: classification result, detection visualization with bbox, cardiothoracic ratio measurement from segmentation, and comprehensive clinical assessment with severity grading if enlarged
+Step 1: classification_chest(image_path) - Get confidence scores for all 14 categories
+Step 2: detect_chest_abnormality(image_path) - Grounding all abnormalities with bboxes
+Step 3: Filter diseases: Select diseases where (conf > 0.05 and has bbox in detection results)
+Step 4: For each selected disease → verify_property([original, detection overlays for this disease, segmentation overlays], "Explain this [disease_name]: describe the visual evidence, location, characteristics, and clinical significance")
+Step 5: Return answer with:
+   - Direct answer: List of detected diseases with confidence > 0.05
+   - Raw outputs: classification_chest (full dict of all 14 categories), detect_chest_abnormality (complete output), segment_lungs_heart (if called)
 
 A:
 def execute_command(image_path):
     image_patch = ImagePatch()
 
-    # Step 1: Classify for cardiomegaly - returns list of diseases or None
-    diagnoses = image_patch.classification_chest(image_path)
+    # Step 1: classification_chest(image_path) - Get confidence scores for all 14 categories
+    diagnoses_classification = image_patch.classification_chest(image_path)
 
-    # Step 2: Detect cardiomegaly with precise bbox
+    # Step 2: detect_chest_abnormality(image_path) - Grounding all abnormalities with bboxes
     detection_result = image_patch.detect_chest_abnormality(image_path)
 
-    # Step 3: Segment heart and lung fields
-    segmentation = image_patch.segment_lungs_heart(image_path)
-
-    # Step 4: Clinical assessment with all visual evidence
-    overlay_images = [image_path]
-
-    # Add cardiomegaly detection overlay if present (bbox drawn on image)
-    if detection_result['detection']['overlay_paths'] and 'Cardiomegaly' in detection_result['detection']['overlay_paths']:
-        overlay_images.append(detection_result['detection']['overlay_paths']['Cardiomegaly'])
-
-    # Add anatomical segmentation overlay (lungs/heart segmented on image)
-    overlay_images.append(segmentation['overlay_path'])
-
-    # Add individual abnormality segmentation overlays if any
-    for seg in detection_result['segmentations']:
-        if seg['abnormality'] == 'Cardiomegaly':
-            overlay_images.append(seg['overlay_path'])
-
-    assessment = image_patch.verify_property(
-        overlay_images,
-        f"Evaluate the heart size and calculate the cardiothoracic ratio. Is the heart enlarged? Explain the findings with reference to normal values (CTR < 0.5). Detected conditions: {{diagnoses if diagnoses else 'None'}}."
-    )
-
-    # Step 5: Return definitive yes/no answer
-    is_enlarged = diagnoses and "Cardiomegaly" in diagnoses
-
-    return {{
-        "heart_enlarged": is_enlarged,
-        "all_diagnoses": diagnoses if diagnoses else [],
-        "detection_result": {{
-            "has_cardiomegaly_bbox": "Cardiomegaly" in detection_result['detection']['label_names'],
-            "overlay_path": detection_result['detection']['overlay_paths'].get('Cardiomegaly')
-        }},
-        "segmentation": {{
-            "heart_mask": segmentation['H_mask_path'],
-            "overlay": segmentation['overlay_path']
-        }},
-        "detailed_assessment": assessment,
-        "recommendation": "Cardiology consultation recommended" if is_enlarged else "Heart size appears normal"
+    # Step 3: Filter diseases: Select diseases where (conf > 0.05 and has bbox in detection results)
+    detected_label_names = detection_result['detection']['label_names']
+    filtered_diseases = {{
+        disease: conf 
+        for disease, conf in diagnoses_classification.items() 
+        if conf > 0.05 and disease in detected_label_names
     }}
 
-### Example 4: Detailed Chest Analysis
-Plan:
-Step 1: Use segment_lungs_heart(image_path) for anatomical segmentation - Returns lung and heart masks (establishes anatomical baseline)
-Step 2: Use detect_chest_abnormality(image_path) to detect and segment any abnormalities - Returns detection with bboxes and segmentation masks for each abnormality (identifies all pathological findings)
-Step 3: Use classification_chest(image_path) to identify primary disease/condition - Returns disease label or None (provides overall diagnostic impression)
-Step 4: Use verify_property with comprehensive visual evidence (original image, anatomical segmentation overlay, all detection overlays) to generate detailed radiological report: "Provide comprehensive chest X-ray analysis including: 1) Technical quality, 2) Anatomical structures assessment, 3) All detected abnormalities with locations and characteristics, 4) Primary diagnosis, 5) Clinical significance and recommendations"
-Step 5: Return structured comprehensive report with: anatomical segmentation visualizations, complete list of detected abnormalities with precise locations and segmentations, classification diagnosis, and detailed clinical narrative integrating all findings
+    # Step 4: For each selected disease → verify_property([original, detection overlays for this disease, segmentation overlays], "Explain this [disease_name]: describe the visual evidence, location, characteristics, and clinical significance")
+    disease_explanations = {}
+    for disease_name in filtered_diseases.keys():
+        # Collect visual evidence for this disease
+        visual_evidence = [image_path]
+        
+        # Add detection overlay if available
+        if disease_name in detection_result['detection']['overlay_paths']:
+            visual_evidence.append(detection_result['detection']['overlay_paths'][disease_name])
+        
+        # Add segmentation overlay if available
+        for seg in detection_result['segmentations']:
+            if seg['abnormality'] == disease_name:
+                visual_evidence.append(seg['overlay_path'])
+        
+        # Get clinical explanation for this disease
+        explanation = image_patch.verify_property(
+            visual_evidence,
+            f"Analyze the {{disease_name}} findings in this chest X-ray: 1) Describe the visual evidence and appearance, 2) Specify the anatomical location and extent, 3) Characterize the key features (size, shape, density, borders), 4) Assess the severity (mild/moderate/severe), 5) Explain the clinical significance and potential implications."
+        )
+        disease_explanations[disease_name] = explanation
 
-A:
-def execute_command(image_path):
-    image_patch = ImagePatch()
-
-    # Step 1: Anatomical segmentation
-    segmentation = image_patch.segment_lungs_heart(image_path)
-
-    # Step 2: Detect and segment any abnormalities
-    detection_result = image_patch.detect_chest_abnormality(image_path)
-
-    # Step 3: Classify diseases - returns list of diseases or None
-    diagnoses = image_patch.classification_chest(image_path)
-
-    # Step 4: Comprehensive analysis with all visual evidence
-    overlay_images = [image_path, segmentation['overlay_path']]
-
-    # Add all detection overlays (bboxes drawn on image)
-    overlay_images.extend(list(detection_result['detection']['overlay_paths'].values()))
-
-    # Add individual abnormality segmentation overlays (each abnormality's mask on image)
-    overlay_images.extend([seg['overlay_path'] for seg in detection_result['segmentations']])
-
-    findings_text = f"Detected conditions: {{', '.join(diagnoses)}}" if diagnoses else "No specific abnormalities detected"
-    comprehensive_analysis = image_patch.verify_property(
-        overlay_images,
-        f"Provide comprehensive chest X-ray analysis including: 1) Technical quality, 2) Anatomical structures assessment, 3) All detected abnormalities with locations and characteristics, 4) Primary diagnosis, 5) Clinical significance and recommendations. {{findings_text}}. Analyze the segmentation overlays and detection results."
-    )
-
-    # Step 5: Return complete structured report
+    # Step 5: Return answer with comprehensive results
     return {{
-        "all_findings": diagnoses if diagnoses else [],
-        "num_findings": len(diagnoses) if diagnoses else 0,
-        "anatomical_segmentation": {{
-            "overlay": segmentation['overlay_path'],
-            "right_lung": segmentation['RL_mask_path'],
-            "left_lung": segmentation['LL_mask_path'],
-            "heart": segmentation['H_mask_path']
-        }},
-        "detected_abnormalities": {{
-            "count": len(detection_result['detection']['boxes']),
-            "types": detection_result['detection']['label_names'],
-            "detection_overlays": detection_result['detection']['overlay_paths'],
-            "segmentation_masks": [
-                {{
-                    "abnormality": seg['abnormality'],
-                    "mask_path": seg['mask_path'],
-                    "overlay_path": seg['overlay_path'],
-                    "location": seg['box']
-                }}
-                for seg in detection_result['segmentations']
-            ]
-        }},
-        "comprehensive_analysis": comprehensive_analysis,
-        "has_abnormality": diagnoses is not None and len(diagnoses) > 0,
-        "recommendation": "Medical review recommended" if diagnoses else "No abnormalities detected - appears normal"
+        "detected_diseases": list(filtered_diseases.keys()),
+        "classification_scores": diagnoses_classification,
+        "filtered_diseases_with_scores": filtered_diseases,
+        "detection_result": detection_result,
+        "disease_explanations": disease_explanations,
     }}
 '''
