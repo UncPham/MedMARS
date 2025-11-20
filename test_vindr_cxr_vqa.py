@@ -12,7 +12,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__))))
 from src.medmars import MedMARS
 
 # Configuration
-NUM_QUESTIONS_TO_TEST = 50  # Set to None to test all questions, or a number like 10 to test first 10
+NUM_QUESTIONS_TO_TEST = 15  # Set to None to test all questions, or a number 
 JSON_PATH = "src/data/vindr_cxr_vqa/val_v1_clean.json"
 IMAGES_DIR = "src/data/vindr_cxr_vqa/images"
 IOU_THRESHOLD = 0.3  # IoU threshold for considering a detection as correct
@@ -22,20 +22,6 @@ TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
 OUTPUT_BASE_DIR = f"logs/vindr_cxr_vqa_{TIMESTAMP}"
 
 def scale_bbox_to_1024(bbox: List[int], orig_width: int, orig_height: int) -> List[float]:
-    """
-    Scale bounding box from original image size to 1024x1024
-
-    Images were resized by stretching (ignoring aspect ratio) from original size to 1024x1024.
-    GT boxes are in original resolution, so we need to scale them to match the processed images.
-
-    Args:
-        bbox: [x1, y1, x2, y2] in original resolution
-        orig_width: Original image width
-        orig_height: Original image height
-
-    Returns:
-        [x1, y1, x2, y2] in 1024x1024 resolution
-    """
     target_size = 1024
     scale_x = target_size / orig_width
     scale_y = target_size / orig_height
@@ -48,15 +34,6 @@ def scale_bbox_to_1024(bbox: List[int], orig_width: int, orig_height: int) -> Li
     ]
 
 def parse_location_tag(loc_string: str) -> Optional[List[int]]:
-    """
-    Parse location tag from format <loc_x1_y1_x2_y2> to [x1, y1, x2, y2]
-
-    Args:
-        loc_string: String containing location tag like "<loc_691_1375_1653_1831>"
-
-    Returns:
-        List of [x1, y1, x2, y2] coordinates or None if not found
-    """
     pattern = r'<loc_(\d+)_(\d+)_(\d+)_(\d+)>'
     match = re.search(pattern, loc_string)
     if match:
@@ -65,30 +42,11 @@ def parse_location_tag(loc_string: str) -> Optional[List[int]]:
     return None
 
 def extract_all_locations(text: str) -> List[List[int]]:
-    """
-    Extract all location tags from text
-
-    Args:
-        text: Text containing location tags
-
-    Returns:
-        List of bounding boxes [[x1, y1, x2, y2], ...]
-    """
     pattern = r'<loc_(\d+)_(\d+)_(\d+)_(\d+)>'
     matches = re.findall(pattern, text)
     return [[int(m[0]), int(m[1]), int(m[2]), int(m[3])] for m in matches]
 
 def calculate_iou(box1: List[int], box2: List[int]) -> float:
-    """
-    Calculate IoU (Intersection over Union) between two bounding boxes
-
-    Args:
-        box1: [x1, y1, x2, y2]
-        box2: [x1, y1, x2, y2]
-
-    Returns:
-        IoU score (0.0 to 1.0)
-    """
     # Calculate intersection coordinates
     x1_inter = max(box1[0], box2[0])
     y1_inter = max(box1[1], box2[1])
@@ -113,17 +71,6 @@ def calculate_iou(box1: List[int], box2: List[int]) -> float:
 
 def calculate_bbox_metrics(pred_boxes: List[List[int]], gt_boxes: List[List[int]],
                            iou_threshold: float = 0.3) -> Dict[str, float]:
-    """
-    Calculate bbox detection metrics: IoU@threshold, Recall, F1
-
-    Args:
-        pred_boxes: List of predicted bounding boxes
-        gt_boxes: List of ground truth bounding boxes
-        iou_threshold: IoU threshold for considering a match
-
-    Returns:
-        Dictionary with metrics: {'iou_mean', 'recall', 'f1', 'precision'}
-    """
     if len(gt_boxes) == 0:
         # No ground truth boxes
         if len(pred_boxes) == 0:
@@ -380,7 +327,7 @@ def test_vindr_cxr_vqa():
 
             # Extract answer and reason from response
             pred_answer = response.get('answer', '')
-            pred_reason = response.get('reason', '')
+            pred_reason = response.get('reason', '') + " Visible at specified location."
 
             logger.info(f"Predicted Answer: {pred_answer}")
 

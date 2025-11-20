@@ -26,7 +26,7 @@ if hybridgnet_path not in sys.path:
 from src.vision_models.deim_model import DEIMModel
 
 # Configuration
-NUM_IMAGES_TO_TEST = None  # Set to None to test all images, or a number like 100
+NUM_IMAGES_TO_TEST = None  # Set to None to test all images
 JSON_PATH = "src/data/vindr_cxr_vqa/val_v1_clean.json"
 IMAGES_DIR = "src/data/vindr_cxr_vqa/images"
 CONF_THRESHOLD = 0.3  # Confidence threshold for detections
@@ -37,15 +37,6 @@ TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
 OUTPUT_DIR = f"logs/deim_evaluation_{TIMESTAMP}"
 
 def parse_location_tag(loc_string: str) -> List[int]:
-    """
-    Parse location tag from format <loc_x1_y1_x2_y2> to [x1, y1, x2, y2]
-
-    Args:
-        loc_string: String containing location tag like "<loc_691_1375_1653_1831>"
-
-    Returns:
-        List of [x1, y1, x2, y2] coordinates or None if not found
-    """
     pattern = r'<loc_(\d+)_(\d+)_(\d+)_(\d+)>'
     match = re.search(pattern, loc_string)
     if match:
@@ -54,20 +45,6 @@ def parse_location_tag(loc_string: str) -> List[int]:
     return None
 
 def scale_bbox_to_1024(bbox: List[int], orig_width: int, orig_height: int) -> List[float]:
-    """
-    Scale bounding box from original image size to 1024x1024
-
-    Images were resized by stretching (ignoring aspect ratio) from original size to 1024x1024.
-    GT boxes are in original resolution, so we need to scale them to match DEIM's output.
-
-    Args:
-        bbox: [x1, y1, x2, y2] in original resolution
-        orig_width: Original image width
-        orig_height: Original image height
-
-    Returns:
-        [x1, y1, x2, y2] in 1024x1024 resolution
-    """
     target_size = 1024
     scale_x = target_size / orig_width
     scale_y = target_size / orig_height
@@ -80,16 +57,6 @@ def scale_bbox_to_1024(bbox: List[int], orig_width: int, orig_height: int) -> Li
     ]
 
 def calculate_iou(box1: List[int], box2: List[int]) -> float:
-    """
-    Calculate IoU (Intersection over Union) between two bounding boxes
-
-    Args:
-        box1: [x1, y1, x2, y2]
-        box2: [x1, y1, x2, y2]
-
-    Returns:
-        IoU score (0.0 to 1.0)
-    """
     # Calculate intersection coordinates
     x1_inter = max(box1[0], box2[0])
     y1_inter = max(box1[1], box2[1])
@@ -118,12 +85,6 @@ def match_predictions_to_gt(pred_boxes: List[List[int]],
                             gt_boxes: List[List[int]],
                             gt_labels: List[str],
                             iou_threshold: float = 0.3) -> Dict:
-    """
-    Match predicted boxes to ground truth boxes using IoU threshold
-
-    Returns:
-        Dict with matched predictions, false positives, and false negatives
-    """
     matches = []  # List of (pred_idx, gt_idx, iou, label)
     matched_gt = set()
     matched_pred = set()
@@ -200,16 +161,6 @@ def calculate_metrics_per_class(all_predictions: List[Dict],
                                  all_ground_truths: List[Dict],
                                  class_name: str,
                                  iou_threshold: float = 0.3) -> Dict:
-    """
-    Calculate detection rate (recall-only) for a specific class.
-
-    This metric focuses ONLY on whether GT findings are detected correctly.
-    False positives (extra predictions) do NOT affect the score.
-
-    This is appropriate when:
-    - GT annotations may be incomplete (e.g., VQA data)
-    - We only care about detecting what's labeled, not penalizing extra detections
-    """
     # Collect all predictions and GTs for this class
     class_predictions = []
     class_gts = []
