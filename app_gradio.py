@@ -240,29 +240,66 @@ def step3_execution():
 
 def enrich_explanation_with_images(explanation, overlay_images):
     """
-    Thêm overlay images vào explanation dạng markdown
+    Thay thế relative image paths trong explanation bằng base64 embedded images
+    để Gradio có thể hiển thị
 
     Args:
-        explanation: Explanation text từ reporter
+        explanation: Explanation text từ reporter (có thể chứa markdown images)
         overlay_images: List các đường dẫn overlay images
 
     Returns:
-        Markdown text với embedded images
+        Markdown text với base64 embedded images
     """
     if not overlay_images:
         return explanation
 
-    # Thêm section cho overlay images
-    image_section = "\n\n---\n\n### 🖼️ Hình ảnh minh họa\n\n"
+    import base64
+    import re
 
-    for i, img_path in enumerate(overlay_images, 1):
-        # Lấy tên file
-        img_name = Path(img_path).stem.replace("overlay_", "").replace("_", " ").title()
-        # Thêm markdown image syntax
-        image_section += f"**{i}. {img_name}**\n\n"
-        image_section += f"![{img_name}]({img_path})\n\n"
+    # Tạo mapping từ tên file -> base64 data URL
+    image_map = {}
+    for img_path in overlay_images:
+        try:
+            img_name = Path(img_path).name
+            with open(img_path, "rb") as img_file:
+                img_data = img_file.read()
+                img_base64 = base64.b64encode(img_data).decode()
+                image_map[img_name] = f"data:image/png;base64,{img_base64}"
+            print(f"✅ Loaded image for embedding: {img_name}")
+        except Exception as e:
+            print(f"⚠️  Warning: Không thể load ảnh {img_path}: {e}")
+            continue
 
-    return explanation + image_section
+    # Tìm và thay thế tất cả markdown images: ![](filename.png) hoặc ![alt](filename.png)
+    def replace_image_path(match):
+        alt_text = match.group(1)  # Alt text (có thể rỗng)
+        filename = match.group(2)  # Tên file
+        
+        print(f"🔎 Matching image: alt=[{alt_text}], filename=[{filename}]")
+        
+        # Nếu alt text chính là filename, thì lấy tên file làm display name
+        if alt_text == filename:
+            alt_text = ""
+        
+        if filename in image_map:
+            data_url = image_map[filename]
+            # Sử dụng HTML img tag thay vì markdown để có thể style
+            display_name = alt_text if alt_text else filename.replace("overlay_", "").replace("segmentation_", "").replace(".png", "").replace("_", " ").title()
+            print(f"✅ Replaced with embedded image: {display_name}")
+            return f'<img src="{data_url}" alt="{display_name}" style="max-width: 100%; height: auto; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; padding: 5px;" />'
+        else:
+            # Giữ nguyên nếu không tìm thấy
+            print(f"⚠️  Warning: Không tìm thấy ảnh {filename} trong overlay_images")
+            return match.group(0)
+
+    # Regex pattern để match markdown images
+    # Sử dụng finditer để match tất cả occurrences, kể cả khi ảnh nằm liền nhau
+    pattern = r'!\[([^\]]*)\]\(([^)]+\.png)\)'
+    enriched_explanation = re.sub(pattern, replace_image_path, explanation)
+
+    print(f"\n🔍 Debug: Found {len(re.findall(pattern, explanation))} image references in explanation")
+
+    return enriched_explanation
 
 
 def step4_generate_answer(question):
@@ -292,17 +329,31 @@ def step4_generate_answer(question):
         answer = response.get('answer', 'No answer generated')
         explanation = response.get('explanation') or response.get('reason', 'No explanation available')
 
-        # Collect overlay images để nhúng vào explanation
+        # Collect ALL PNG images trong output_dir để nhúng vào explanation
+        # (bao gồm cả overlay_*.png, segmentation_*.png, etc.)
         overlay_images = []
         if state.output_dir and state.output_dir.exists():
-            for img_file in sorted(state.output_dir.glob("overlay_*.png")):
-                overlay_images.append(str(img_file))
+            for img_file in sorted(state.output_dir.glob("*.png")):
+                # Skip input image
+                if img_file.name != "input_image.jpg":
+                    overlay_images.append(str(img_file))
+                    print(f"📁 Collected image: {img_file.name}")
 
+        print(f"\n📊 Total images collected: {len(overlay_images)}")
+        
+        # Debug: Print original explanation
+        print(f"\n📄 Original explanation preview:")
+        print(explanation[:500])
+        
         # Enrich explanation với embedded images
         explanation_with_images = enrich_explanation_with_images(explanation, overlay_images)
+        
+        # Debug: Check if replacement happened
+        print(f"\n🔄 Explanation changed: {explanation != explanation_with_images}")
+        print(f"📏 Original length: {len(explanation)}, New length: {len(explanation_with_images)}")
 
         print(f"💬 Answer: {answer}")
-        print(f"📝 Explanation: {explanation[:100]}...")
+        print(f"📝 Explanation: {explanation}")
         print(f"🖼️  Embedded {len(overlay_images)} images in explanation")
 
         return "✅ Bước 4: Đã tạo câu trả lời", answer, explanation_with_images, ""
@@ -316,7 +367,7 @@ def step4_generate_answer(question):
 
 def step5_collect_images():
     """
-    STEP 5: Collect overlay images
+    STEP 5: Collect ALL images (not just overlay_*.png)
     """
     print("\n" + "="*60)
     print("STEP 5: COLLECT IMAGES")
@@ -325,11 +376,14 @@ def step5_collect_images():
     try:
         overlay_images = []
         if state.output_dir and state.output_dir.exists():
-            for img_file in sorted(state.output_dir.glob("overlay_*.png")):
-                overlay_images.append(str(img_file))
-                print(f"🖼️  Found overlay: {img_file.name}")
+            # Collect ALL PNG files, not just overlay_*.png
+            for img_file in sorted(state.output_dir.glob("*.png")):
+                # Skip input image
+                if img_file.name != "input_image.jpg":
+                    overlay_images.append(str(img_file))
+                    print(f"🖼️  Found image: {img_file.name}")
 
-        print(f"✅ Tìm thấy {len(overlay_images)} overlay images")
+        print(f"✅ Tìm thấy {len(overlay_images)} images")
         print("="*60)
         print("✅ HOÀN THÀNH TẤT CẢ CÁC BƯỚC!")
         print("="*60 + "\n")
