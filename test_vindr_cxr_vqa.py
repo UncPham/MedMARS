@@ -12,14 +12,18 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__))))
 from src.medmars import MedMARS
 
 # Configuration
-NUM_QUESTIONS_TO_TEST = 15  # Set to None to test all questions, or a number 
+# Option 1: Test first N questions
+NUM_QUESTIONS_TO_TEST = None  # Set to None to test all questions, or a number (e.g., 50)
+
+# Option 2: Test questions in a range (START, END) - overrides NUM_QUESTIONS_TO_TEST if set
+QUESTION_RANGE = (0, 50)  # Set to None to use NUM_QUESTIONS_TO_TEST, or (start, end) like (20, 50)
+
 JSON_PATH = "src/data/vindr_cxr_vqa/val_v1_clean.json"
 IMAGES_DIR = "src/data/vindr_cxr_vqa/images"
 IOU_THRESHOLD = 0.3  # IoU threshold for considering a detection as correct
 
 # Generate timestamp for this test run
 TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
-OUTPUT_BASE_DIR = f"logs/vindr_cxr_vqa_{TIMESTAMP}"
 
 def scale_bbox_to_1024(bbox: List[int], orig_width: int, orig_height: int) -> List[float]:
     target_size = 1024
@@ -224,32 +228,7 @@ def setup_logging(test_run_dir):
 
 def test_vindr_cxr_vqa():
     """Main test function"""
-    # Create output directory
-    os.makedirs(OUTPUT_BASE_DIR, exist_ok=True)
-
-    # Setup logging
-    logger = setup_logging(OUTPUT_BASE_DIR)
-    logger.info(f"Starting VinDr-CXR VQA test run at {TIMESTAMP}")
-    logger.info(f"Test results will be saved to: {OUTPUT_BASE_DIR}")
-
-    # Load COCO annotations to get original image dimensions
-    logger.info("Loading COCO annotations for image dimensions...")
-    coco_train_path = "src/data/vinbigdata-cxr-ad-coco/annotations/instances_train.json"
-    coco_val_path = "src/data/vinbigdata-cxr-ad-coco/annotations/instances_val.json"
-
-    image_dimensions = {}  # image_id -> (width, height)
-
-    for coco_path in [coco_train_path, coco_val_path]:
-        if os.path.exists(coco_path):
-            with open(coco_path, 'r') as f:
-                coco_data = json.load(f)
-            for img in coco_data['images']:
-                image_id = img['file_name'].replace('.jpg', '')
-                image_dimensions[image_id] = (img['width'], img['height'])
-
-    logger.info(f"Loaded dimensions for {len(image_dimensions)} images")
-
-    # Read JSON file
+    # Read JSON file first to determine the range
     with open(JSON_PATH, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
@@ -269,11 +248,64 @@ def test_vindr_cxr_vqa():
                 'gt_location': vqa['gt_location']
             })
 
-    # Limit number of questions if specified
-    if NUM_QUESTIONS_TO_TEST is not None:
-        all_questions = all_questions[:NUM_QUESTIONS_TO_TEST]
+    # Store original indices for logging
+    original_start_idx = 0
+    original_end_idx = len(all_questions)
 
-    logger.info(f"Testing {len(all_questions)} questions from {len(data)} images...")
+    # Determine output directory name based on test range
+    if QUESTION_RANGE is not None:
+        # Option 2: Test questions in range [start, end)
+        start, end = QUESTION_RANGE
+        original_start_idx = start
+        original_end_idx = end
+        all_questions = all_questions[start:end]
+        OUTPUT_BASE_DIR = f"logs/vindr_cxr_vqa_{TIMESTAMP}_range_{start}_{end}"
+    elif NUM_QUESTIONS_TO_TEST is not None:
+        # Option 1: Test first N questions
+        original_end_idx = NUM_QUESTIONS_TO_TEST
+        all_questions = all_questions[:NUM_QUESTIONS_TO_TEST]
+        OUTPUT_BASE_DIR = f"logs/vindr_cxr_vqa_{TIMESTAMP}_first_{NUM_QUESTIONS_TO_TEST}"
+    else:
+        OUTPUT_BASE_DIR = f"logs/vindr_cxr_vqa_{TIMESTAMP}_all"
+
+    # Create output directory and setup logger
+    os.makedirs(OUTPUT_BASE_DIR, exist_ok=True)
+    logger = setup_logging(OUTPUT_BASE_DIR)
+
+    # Now we can start logging
+    logger.info("="*80)
+    logger.info("VinDr-CXR VQA Test Started")
+    logger.info("="*80)
+
+    # Log the test range
+    if QUESTION_RANGE is not None:
+        logger.info(f"TESTING RANGE: Questions {original_start_idx} to {original_end_idx-1} (indices)")
+    elif NUM_QUESTIONS_TO_TEST is not None:
+        logger.info(f"TESTING RANGE: First {NUM_QUESTIONS_TO_TEST} questions (0 to {NUM_QUESTIONS_TO_TEST-1})")
+    else:
+        logger.info(f"TESTING RANGE: All questions (0 to {len(all_questions)-1})")
+
+    logger.info(f"Total questions in range: {len(all_questions)} from {len(data)} images")
+    logger.info(f"Output directory: {OUTPUT_BASE_DIR}")
+    logger.info("")
+
+    # Load COCO annotations to get original image dimensions
+    logger.info("Loading COCO annotations for image dimensions...")
+    coco_train_path = "src/data/vinbigdata-cxr-ad-coco/annotations/instances_train.json"
+    coco_val_path = "src/data/vinbigdata-cxr-ad-coco/annotations/instances_val.json"
+
+    image_dimensions = {}  # image_id -> (width, height)
+
+    for coco_path in [coco_train_path, coco_val_path]:
+        if os.path.exists(coco_path):
+            with open(coco_path, 'r') as f:
+                coco_data = json.load(f)
+            for img in coco_data['images']:
+                image_id = img['file_name'].replace('.jpg', '')
+                image_dimensions[image_id] = (img['width'], img['height'])
+
+    logger.info(f"Loaded dimensions for {len(image_dimensions)} images")
+    logger.info("")
 
     # Initialize MedMARS
     logger.info("Initializing MedMARS...")
@@ -292,8 +324,10 @@ def test_vindr_cxr_vqa():
     metrics_by_type = {}
 
     for i, q in enumerate(all_questions):
+        # Calculate absolute index in full dataset
+        absolute_idx = original_start_idx + i
         logger.info("="*80)
-        logger.info(f"Question {i+1}/{len(all_questions)}")
+        logger.info(f"Question {i+1}/{len(all_questions)} (Absolute index: {absolute_idx})")
         logger.info("="*80)
 
         image_id = q['image_id']
@@ -307,8 +341,8 @@ def test_vindr_cxr_vqa():
 
         image_path = os.path.join(IMAGES_DIR, f"{image_id}.jpg")
 
-        # Create output directory for this question
-        output_dir = os.path.join(OUTPUT_BASE_DIR, f"vqa_{i}")
+        # Create output directory for this question (using absolute index for easy lookup)
+        output_dir = os.path.join(OUTPUT_BASE_DIR, f"vqa_{absolute_idx}")
         os.makedirs(output_dir, exist_ok=True)
 
         logger.info(f"Image ID: {image_id}")
@@ -417,7 +451,7 @@ def test_vindr_cxr_vqa():
             save_markdown_report(output_dir, question_data)
 
             all_results.append({
-                'question_id': i,
+                'question_id': absolute_idx,
                 'image_id': image_id,
                 'question': question,
                 'type': q_type,
@@ -465,7 +499,7 @@ def test_vindr_cxr_vqa():
             save_markdown_report(output_dir, error_data)
 
             all_results.append({
-                'question_id': i,
+                'question_id': absolute_idx,
                 'image_id': image_id,
                 'question': question,
                 'type': q_type,
@@ -522,7 +556,11 @@ def test_vindr_cxr_vqa():
     summary_path = os.path.join(OUTPUT_BASE_DIR, "test_summary.json")
     summary_data = {
         'timestamp': TIMESTAMP,
-        'num_questions': len(all_questions),
+        'test_range': {
+            'start_idx': original_start_idx,
+            'end_idx': original_end_idx - 1,
+            'num_questions': len(all_questions)
+        },
         'iou_threshold': IOU_THRESHOLD,
         'overall_metrics': {
             'text_recall': avg_text_recall if text_recalls else 0.0,

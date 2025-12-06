@@ -22,7 +22,7 @@ from src.prompts.explainer_prompt import EXPLAINER_PROMPT
 
 
 class Explainer:
-    def __init__(self, model_provider: str = LLM_MODEL):
+    def __init__(self, model_provider: str = "openai"):
         self.model_provider = model_provider.lower()
 
         if self.model_provider == "openai":

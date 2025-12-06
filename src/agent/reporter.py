@@ -19,7 +19,7 @@ from src.prompts.reporter_prompt import REPORTER_PROMPT
 
 
 class Reporter:
-    def __init__(self, model_provider: str = LLM_MODEL):
+    def __init__(self, model_provider: str = "openai"):
         self.model_provider = model_provider.lower()
 
         if self.model_provider == "openai":

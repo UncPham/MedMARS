@@ -84,34 +84,35 @@ PLANNER_PROMPT = '''
 **1. Asking about SPECIFIC disease** (e.g., "Is there pneumonia?", "Does this show cardiomegaly?"):
    - Step 1: best_image_match([image_path], [disease_name]) - Check if disease present
    - Step 2: detect_chest_abnormality(image_path) - Grounding with bboxes
-   - Step 3: IF (has bbox AND classification conf > 0.05) → verify_property([original, overlays], "Explain why this region indicates [disease]")
+   - Step 3: Use OR logic: IF (classification > 0.05 AND has_bbox) OR (detection_score > 0.5) → verify_property([original, overlays], "Explain why this region indicates [disease]")
    - Step 4: IF disease needs anatomy (Cardiomegaly, lung zones) → segment_lungs_heart(image_path)
    - Output: Raw results + Combined logic result (Yes/No + conf + bbox + explanation)
 
 **2. Asking about GENERAL diseases** (e.g., "What diseases are present?"):
    - Step 1: classification_chest(image_path) - Get all disease confidences
    - Step 2: detect_chest_abnormality(image_path) - Grounding with bboxes
-   - Step 3: For diseases with conf > 0.05 AND has bbox → verify_property to explain
+   - Step 3: Use OR logic: For diseases where (classification > 0.05 AND has_bbox) OR (detection_score > 0.5) → verify_property to explain
    - Step 4: IF any disease needs anatomy → segment_lungs_heart(image_path)
    - Output: Raw results + Combined logic result (list diseases with conf + bboxes + explanations)
 
 **3. Asking about MAIN disease** (e.g., "What is the primary finding?"):
    - Step 1: classification_chest(image_path) - Get all confidences
-   - Step 2: Select disease with highest conf
-   - Step 3: detect_chest_abnormality(image_path) - Find its bbox
+   - Step 2: detect_chest_abnormality(image_path) - Get all detections
+   - Step 3: Select disease with highest score (considering both classification confidence and detection score)
    - Step 4: verify_property to explain main finding
    - Step 5: IF main disease needs anatomy → segment_lungs_heart(image_path)
-   - Output: Raw results + Main disease (highest conf + bbox + explanation)
+   - Output: Raw results + Main disease (highest score + bbox + explanation)
 
 **4. Location questions** (e.g., "Where is [finding]?"):
    - Detect with bboxes → Map to anatomical zones → IF needs lung/heart context → segment_lungs_heart
 
 **5. Counting questions** (e.g., "How many findings?"):
-   - classification_chest + detect_chest_abnormality → Count unique abnormalities with conf > 0.05
+   - classification_chest + detect_chest_abnormality → Count using OR logic: (classification > 0.05 AND has_bbox) OR (detection_score > 0.5)
 
 **CRITICAL Rules**:
 - Always return RAW outputs from all methods unchanged
-- Add COMBINED result from logic (using conf threshold 0.05, bbox presence, anatomy needs)
+- Use OR logic for disease detection: Trust classification OR detection (whichever is stronger)
+- Detection and classification are independent - detection might find bbox with high score even when classification is 0
 - Diseases needing anatomy visualization: Cardiomegaly, Aortic enlargement, Pleural effusion, Pneumothorax, lung zone questions
 
 **Output Format** (strict):
@@ -167,10 +168,10 @@ User Query: Does this X-ray show cardiomegaly?
 Step 1: best_image_match([image_path], ["Cardiomegaly"]) - Check cardiomegaly confidence
 Step 2: detect_chest_abnormality(image_path) - Grounding heart region with bbox
 Step 3: segment_lungs_heart(image_path) - get heart and lung masks
-Step 4: Check logic: if (has heart bbox and cardiomegaly conf > 0.05) → Step 5, else → return No
+Step 4: Check logic using OR: if (classification > 0.05 AND has_bbox) OR (detection_score > 0.5) → Step 5, else → return No
 Step 5: verify_property([original, detection overlays, anatomical segmentation overlay], "Evaluate if the heart is enlarged: calculate cardiothoracic ratio from segmentation masks, compare heart size to thorax width, reference normal CTR < 0.5, explain findings")
 Step 6: Return answer with:
-   - Direct answer: Yes/No (based on conf > 0.05 and has bbox and CTR assessment)
+   - Direct answer: Yes/No (based on OR logic and CTR assessment)
    - Raw outputs: best_image_match results {{"Cardiomegaly": confidence}}, detect_chest_abnormality (boxes, scores, label_names, overlay_paths, segmentations), segment_lungs_heart (overlay_path, H_mask_path, RL_mask_path, LL_mask_path)
    - Clinical explanation: observed heart size → bbox location → CTR measurement → significance → conclusion
 </plan>
@@ -194,10 +195,10 @@ Goal: provide complete inventory of diseases with evidence, not just names - eac
 User Query: What diseases are present in this chest X-ray?
 Step 1: classification_chest(image_path) - Get confidence scores for all 14 categories
 Step 2: detect_chest_abnormality(image_path) - Grounding all abnormalities with bboxes
-Step 3: Filter diseases: Select diseases where (conf > 0.05 and has bbox in detection results)
+Step 3: Filter diseases using OR logic: Select where (classification > 0.05 AND has_bbox) OR (detection_score > 0.5)
 Step 4: For each selected disease → verify_property([original, detection overlays for this disease, segmentation overlays], "Explain this [disease_name]: describe the visual evidence, location, characteristics, and clinical significance")
 Step 5: Return answer with:
-   - Direct answer: List of detected diseases with confidence > 0.05
+   - Direct answer: List of detected diseases based on OR logic
    - Raw outputs: classification_chest (full dict of all 14 categories), detect_chest_abnormality (complete output), segment_lungs_heart (if called)
 </plan>
 '''
