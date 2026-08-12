@@ -111,10 +111,14 @@ class MedSAMModel(BaseModel):
 
 
 if __name__ == "__main__":
+    # Smoke test: python -m src.vision_models.medsam_model <image_path>
+    if len(sys.argv) < 2:
+        print(f"Usage: python {sys.argv[0]} <image_path>")
+        sys.exit(1)
+
     model = MedSAMModel()
-    image_path = (
-        "/Users/uncpham/Repo/Medical-Assistant/src/data/vqa_rad/images/img_0.jpg"
-    )
+    image_path = sys.argv[1]
+    # Example prompt boxes in [x1, y1, x2, y2] — adjust to the image being tested.
     input_boxes = [[95.0, 255.0, 190.0, 350.0], [220.0, 100.0, 320.0, 200.0]]
 
     result = model(image_path, input_boxes)

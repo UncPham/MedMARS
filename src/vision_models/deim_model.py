@@ -564,7 +564,11 @@ class DEIMModel(BaseModel):
 
 
 if __name__ == '__main__':
-    # Example usage
+    # Smoke test: python -m src.vision_models.deim_model <image_path>
+    if len(sys.argv) < 2:
+        print(f"Usage: python {sys.argv[0]} <image_path>")
+        sys.exit(1)
+
     print("DEIM Model Example Usage")
     print("=" * 60)
 
@@ -573,7 +577,7 @@ if __name__ == '__main__':
     )
 
     # Run inference on an image
-    image_path = '/Users/uncpham/Repo/Medical-Assistant/src/data/vindr_cxr_vqa/images/0a1aef5326b7b24378c6692f7a454e52.jpg'
+    image_path = sys.argv[1]
 
     # Inference with automatic overlay saving
     results = model(

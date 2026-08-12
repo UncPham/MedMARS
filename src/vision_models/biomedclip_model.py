@@ -9,6 +9,7 @@ from typing import List
 from PIL import Image
 
 from src.vision_models.base_model import BaseModel
+from src.constants.constants import CHESTMNIST_LABEL
 
 
 class BioMedClipModel(BaseModel):
@@ -67,21 +68,14 @@ class BioMedClipModel(BaseModel):
         self.context_length = 256
 
 
-# if __name__ == "__main__":
-#     model = BioMedClipModel()
-#     image_path = [
-#         "/Users/uncpham/Repo/Medical-Assistant/src/data/vqa_rad/images/img_0.jpg"
-#     ]
-#     text = [
-#         "adenocarcinoma histopathology",
-#         "brain MRI",
-#         "covid line chart",
-#         "squamous cell carcinoma histopathology",
-#         "immunohistochemistry histopathology",
-#         "bone X-ray",
-#         "chest X-ray",
-#         "pie chart",
-#         "hematoxylin and eosin histopathology",
-#     ]
-#     outputs = model(image_path, text)
-#     print(outputs)
+if __name__ == "__main__":
+    # Smoke test: python -m src.vision_models.biomedclip_model <image_path>
+    if len(sys.argv) < 2:
+        print(f"Usage: python {sys.argv[0]} <image_path>")
+        sys.exit(1)
+
+    model = BioMedClipModel()
+    image_path = [sys.argv[1]]
+    text = CHESTMNIST_LABEL
+    outputs = model(image_path, text)
+    print(outputs)

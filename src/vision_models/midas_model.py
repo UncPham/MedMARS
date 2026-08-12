@@ -10,6 +10,7 @@ from PIL import Image
 import numpy as np
 
 from src.vision_models.base_model import BaseModel
+from src.constants.env import STATIC_FOLDER
 
 
 class MiDaSModel(BaseModel):
@@ -30,7 +31,7 @@ class MiDaSModel(BaseModel):
             outputs = self.model(**inputs)
             predicted_depth = outputs.predicted_depth
 
-        # resize về cùng kích thước ảnh gốc
+        # resize back to the original image size
         prediction = torch.nn.functional.interpolate(
             predicted_depth.unsqueeze(1),
             size=img.size[::-1],
@@ -42,17 +43,21 @@ class MiDaSModel(BaseModel):
         return depth
 
 if __name__ == "__main__":
+    # Smoke test: python -m src.vision_models.midas_model <image_path>
+    if len(sys.argv) < 2:
+        print(f"Usage: python {sys.argv[0]} <image_path>")
+        sys.exit(1)
+
     model = MiDaSModel()
-    depth = model.forward(
-        "/Users/uncpham/Repo/Medical-Assistant/src/static/anh_meo_hai_huoc1.jpg"
-    )
+    depth = model.forward(sys.argv[1])
 
     print("Depth map generated.")
-    
+
     # Normalize and save as image
     depth_min = depth.min()
     depth_max = depth.max()
     depth_normalized = (depth - depth_min) / (depth_max - depth_min) * 255
     depth_image = Image.fromarray(depth_normalized.astype(np.uint8), mode='L')
-    depth_image.save("/Users/uncpham/Repo/Medical-Assistant/src/static/depth_output.jpg")
-    print("Depth image saved as depth_output.jpg")
+    output_path = os.path.join(STATIC_FOLDER, "depth_output.jpg")
+    depth_image.save(output_path)
+    print(f"Depth image saved as {output_path}")

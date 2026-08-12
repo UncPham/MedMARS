@@ -69,8 +69,13 @@ class CXRHybridGNetSegmentationModel(BaseModel):
         return result
     
 if __name__ == "__main__":
+    # Smoke test: python -m src.vision_models.cxr_hybridgnet_segmentation_model <image_path>
+    if len(sys.argv) < 2:
+        print(f"Usage: python {sys.argv[0]} <image_path>")
+        sys.exit(1)
+
     model = CXRHybridGNetSegmentationModel()
-    image_path = '/Users/uncpham/Repo/Medical-Assistant/src/data/vqa_rad/images/img_0.jpg'
+    image_path = sys.argv[1]
     result = model(image_path)
     print(f"Overlay path: {result['overlay_path']}")
     print(f"Right lung mask path: {result['RL_mask_path']}")
