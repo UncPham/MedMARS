@@ -18,7 +18,13 @@ STATIC_FOLDER.mkdir(exist_ok=True)
 
 # Specific checkpoint files
 DEIM_CHECKPOINT = CHECKPOINT_FOLDER / "best_stg1.pth"
-DEIM_CONFIG = "/Users/uncpham/Repo/Medical-Assistant/src/vision_models/DEIM/configs/deim_dfine/deim_hgnetv2_x_vinbigdata_v3_simple.yml"
+# Must stay inside DEIM/configs/ — the file pulls in sibling configs via
+# relative `__include__` paths (../dataset/, ../base/, ...).
+DEIM_CONFIG = (
+    PROJECT_ROOT
+    / "src" / "vision_models" / "DEIM"
+    / "configs" / "deim_dfine" / "deim_hgnetv2_x_vinbigdata_v3_simple.yml"
+)
 
 # Azure OpenAI Configuration
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
