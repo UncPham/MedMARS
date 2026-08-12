@@ -2,6 +2,8 @@
 
 MedMARS is an agentic medical visual question answering (VQA) system specialized for chest X-ray analysis. Given a radiograph and a clinical question, it plans a diagnostic workflow, calls specialized vision models (detection, segmentation, classification, VQA), and synthesizes the results into a radiologist-style report with bounding boxes, segmentation overlays, and clinical reasoning.
 
+📄 **[Thesis documentation](https://drive.google.com/file/d/11brxQG2yIuYlLd2cvqRVgi96aWSh2EHX/view?usp=sharing)** — full write-up of the system design, methodology, and evaluation results.
+
 ---
 
 ## Highlights
