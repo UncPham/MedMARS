@@ -216,3 +216,12 @@ data/
 
 # Logs
 logs/
+
+# Statics
+static/
+
+# macOS
+.DS_Store
+
+# External vision-model repos (cloned separately, see README)
+src/vision_models/DEIM/
