@@ -18,7 +18,7 @@ from src.image_patch import ImagePatch
 
 
 class MedMARS:
-    def __init__(self, max_rounds: int = 3):
+    def __init__(self, max_rounds: int = 3, max_code_retries: int = 2):
         self.planner = PlannerModel()
         self.code_generator = CoderModel()
         self.reporter = Reporter()
@@ -28,6 +28,7 @@ class MedMARS:
         self.code = None
 
         self.max_rounds = max_rounds
+        self.max_code_retries = max_code_retries
 
     def run(self, query: str, image: Union[str, Path, Image.Image], output_dir: str = None):
         if isinstance(image, (str, Path)):
@@ -44,28 +45,54 @@ class MedMARS:
         print(5*'-',"Thought", 5*'-', '\n' + self.thought)
         print(5*'-',"Plan", 5*'-', '\n' + self.plan)
 
-        self.code = self.code_generator(self.plan)
-        print(5*'-',"Code", 5*'-', '\n' + self.code)
-
-        print("Executing code...")
-        exec_globals = globals().copy()
-        # Create ImagePatch factory with output_dir if specified
-        if output_dir:
-            exec_globals['ImagePatch'] = lambda outputs_dir=output_dir: ImagePatch(outputs_dir=outputs_dir)
-        else:
-            exec_globals['ImagePatch'] = ImagePatch
-        exec(self.code, exec_globals)
+        # Generate and execute code with retry mechanism
+        out = None
         result = None
-        try:
-            execute_command = exec_globals.get('execute_command')
-            if execute_command is None:
-                raise ValueError("execute_command function not found in generated code")
-            out = execute_command(image_path)
-            result = out.copy() if hasattr(out, 'copy') else out
-        except Exception as e:
-            out = str(e)
-            result = None
-            print("Error:", out)
+        error_message = None
+
+        for retry_attempt in range(self.max_code_retries + 1):
+            # Generate code (first attempt or retry with error feedback)
+            if retry_attempt == 0:
+                self.code = self.code_generator(self.plan)
+                print(5*'-',"Code (Attempt 1)", 5*'-', '\n' + self.code)
+            else:
+                print(f"\n{'='*60}")
+                print(f"⚠️  Code execution failed. Retrying ({retry_attempt}/{self.max_code_retries})...")
+                print(f"{'='*60}")
+                # Send error + old code back to coder for fixing
+                retry_prompt = f"{self.plan}\n\n--- PREVIOUS CODE (FAILED) ---\n{self.code}\n\n--- ERROR MESSAGE ---\n{error_message}\n\n--- INSTRUCTIONS ---\nThe code above failed with the error shown. Please fix the code and regenerate it."
+                self.code = self.code_generator(retry_prompt)
+                print(5*'-',f"Code (Attempt {retry_attempt + 1})", 5*'-', '\n' + self.code)
+
+            # Try to execute code
+            print(f"Executing code (attempt {retry_attempt + 1})...")
+            exec_globals = globals().copy()
+            # Create ImagePatch factory with output_dir if specified
+            if output_dir:
+                exec_globals['ImagePatch'] = lambda outputs_dir=output_dir: ImagePatch(outputs_dir=outputs_dir)
+            else:
+                exec_globals['ImagePatch'] = ImagePatch
+
+            try:
+                exec(self.code, exec_globals)
+                execute_command = exec_globals.get('execute_command')
+                if execute_command is None:
+                    raise ValueError("execute_command function not found in generated code")
+                out = execute_command(image_path)
+                result = out.copy() if hasattr(out, 'copy') else out
+                print(f"✅ Code executed successfully on attempt {retry_attempt + 1}!")
+                break  # Success! Exit retry loop
+            except Exception as e:
+                error_message = str(e)
+                print(f"❌ Error on attempt {retry_attempt + 1}:", error_message)
+
+                # If this was the last attempt, keep the error
+                if retry_attempt == self.max_code_retries:
+                    out = error_message
+                    result = None
+                    print(f"\n{'='*60}")
+                    print(f"❌ Code execution failed after {self.max_code_retries + 1} attempts.")
+                    print(f"{'='*60}\n")
 
         # Generate answer and explanation from output
         print("Generating answer...")

@@ -169,11 +169,11 @@ Step 1: best_image_match([image_path], ["Cardiomegaly"]) - Check cardiomegaly co
 Step 2: detect_chest_abnormality(image_path) - Grounding heart region with bbox
 Step 3: segment_lungs_heart(image_path) - get heart and lung masks
 Step 4: Check logic using OR: if (classification > 0.05 AND has_bbox) OR (detection_score > 0.5) → Step 5, else → return No
-Step 5: verify_property([original, detection overlays, anatomical segmentation overlay], "Evaluate if the heart is enlarged: calculate cardiothoracic ratio from segmentation masks, compare heart size to thorax width, reference normal CTR < 0.5, explain findings")
+Step 5: verify_property([original, detection overlays, anatomical segmentation overlay], "Evaluate if the heart is enlarged: calculate cardiothoracic ratio from segmentation masks, compare heart size to thorax width, reference normal, explain findings")
 Step 6: Return answer with:
-   - Direct answer: Yes/No (based on OR logic and CTR assessment)
+   - Direct answer: Yes/No (based on OR logic)
    - Raw outputs: best_image_match results {{"Cardiomegaly": confidence}}, detect_chest_abnormality (boxes, scores, label_names, overlay_paths, segmentations), segment_lungs_heart (overlay_path, H_mask_path, RL_mask_path, LL_mask_path)
-   - Clinical explanation: observed heart size → bbox location → CTR measurement → significance → conclusion
+   - Clinical explanation: observed heart size → bbox location → significance → conclusion
 </plan>
 
 --- EXAMPLE 2: General Diseases Question ---

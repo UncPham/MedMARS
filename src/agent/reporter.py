@@ -44,30 +44,21 @@ class Reporter:
         else:
             raise ValueError(f"Unsupported model provider: {self.model_provider}")
 
-        # Parse answer and reason/explanation from XML-like tags
-        answer = ""
-        reason = ""
-
-        if "<answer>" in content and "</answer>" in content:
-            answer_start = content.find("<answer>") + len("<answer>")
-            answer_end = content.find("</answer>")
-            answer = content[answer_start:answer_end].strip()
-
-        # Try to parse <reason> first (new format), then fall back to <explanation> (old format)
-        if "<reason>" in content and "</reason>" in content:
-            reason_start = content.find("<reason>") + len("<reason>")
-            reason_end = content.find("</reason>")
-            reason = content[reason_start:reason_end].strip()
-        elif "<explanation>" in content and "</explanation>" in content:
-            reason_start = content.find("<explanation>") + len("<explanation>")
-            reason_end = content.find("</explanation>")
-            reason = content[reason_start:reason_end].strip()
+        # Parse JSON response
+        print("Reporter raw content:", content)
+        import json
+        try:
+            result = json.loads(content)
+            answer = result.get("answer", "")
+            reason = result.get("reason", "")
+        except json.JSONDecodeError:
+            # Fallback: try to parse XML tags for backward compatibility
+            answer = ""
+            reason = ""
 
         return {
             "answer": answer,
             "reason": reason,
-            "explanation": reason,  # Backward compatibility
-            "report": content  # Full content for backward compatibility
         }
 
     def _call_openai(self, query: str, output: str, code: str) -> str:
@@ -90,7 +81,8 @@ class Reporter:
             model=AZURE_OPENAI_DEPLOYMENT,
             messages=messages,
             temperature=0.3,
-            max_tokens=3000
+            max_tokens=3000,
+            response_format={"type": "json_object"}
         )
 
         return response.choices[0].message.content

@@ -8,7 +8,6 @@ CHESTMNIST_LABEL = [
     "Consolidation",
     "Pulmonary fibrosis",
     "Infiltration",
-    "Atelectasis",
     "Other lesion",
     "ILD",
     "Pneumothorax",

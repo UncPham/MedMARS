@@ -19,7 +19,7 @@ from src.prompts.code_prompt import CODER_PROMPT, EXAMPLES_CODER
 
 
 class CoderModel:
-    def __init__(self, model_provider: str = LLM_MODEL):
+    def __init__(self, model_provider: str = "openai"):
         self.model_provider = model_provider.lower()
 
         if self.model_provider == "openai":

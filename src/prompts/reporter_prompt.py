@@ -28,58 +28,38 @@ REPORTER_PROMPT = '''
    - No path = no ![...] markdown
 
 **4. Output Format - ALWAYS REQUIRED**:
-   - MUST always output both <answer> and <reason> sections
-   - Never skip or omit either section
+   - MUST always output valid JSON with both "answer" and "reason" fields
+   - Never skip or omit either field
+   - Respond ONLY with valid JSON, no other text
 
-### OUTPUT FORMAT
+### OUTPUT FORMAT (JSON) - Clinical Style
 
-<answer>
-1-2 sentences. Direct answer with <loc_x1_y1_x2_y2> if boxes exist, else answer base on code results.
-**CRITICAL**: Round all bbox coordinates to integers (e.g., 383.07→383, 482.61→483).
-</answer>
+You MUST respond with ONLY valid JSON in the exact format below:
+{{
+  "answer": "Brief summary listing all detected diseases with their locations <loc_x1_y1_x2_y2>. CRITICAL: Round bounding box coordinates to integers.",
+  "reason": "Clinical reasoning written as a radiologist’s step-by-step examination:\\n\\n**1. Initial Assessment:**\\n- List detected diseases from classification (use percentages, NOT thresholds)\\n- Example: 'Detected findings: Aortic enlargement (9.41%), Cardiomegaly (2.57%), ILD (0.59%), Calcification (0.01%)'\\n\\n**2. Detailed Analysis:**\\n\\nFor EACH detected disease:\\n\\n**[Disease Name]:**\\n- **Localization**: <loc_x1_y1_x2_y2> ![](overlay_bbox_path.png)\\n- **Abnormal Region Segmentation**: ![](medsam_overlay_path.png)\\n- **Clinical Explanation**: [Paste full explanation from explainer]\\n\\n**3. Conclusion:**\\n- Clinical summary and recommendations\\n\\nRULES:\\n- DO NOT mention 'threshold 0.05', 'confidence score', or 'detection model' — write like a doctor\\n- Each disease MUST include: bounding box image + segmentation image + explanation\\n- Separate sections for each disease\\n- Use natural medical English"
+}}
 
-<reason>
-Follow code plan steps in order. For each step:
-- Summarize results (show images if paths exist, mention boxes if present - round box coords to integers)
-- If step failed → state "step failed"
-- End with clinical note based on evidence
-</reason>
+### EXAMPLES (New Clinical Format)
 
-### EXAMPLES
+**Example 1: Multiple diseases detected**
+{{
+  "answer": "Detected Aortic enlargement <loc_560_290_680_426>, Cardiomegaly <loc_369_626_845_768>, and ILD <loc_114_186_453_742> on the chest X-ray.",
+  "reason": "**1. Initial Assessment:**\\nAbnormal findings detected: Aortic enlargement (9.41%), Cardiomegaly (2.57%), and ILD (0.59%).\\n\\n**2. Detailed Analysis:**\\n\\n**Aortic enlargement:**\\n- **Localization**: <loc_560_290_680_426> ![](overlay_bbox_Aortic_enlargement.png)\\n- **Abnormal Region Segmentation**: ![](medsam_aortic_enlargement_overlay.png)\\n- **Clinical Explanation**: The aorta demonstrates abnormal morphology with marked dilation at the level of the aortic arch. The degree of enlargement is assessed as moderate to severe. Close monitoring is recommended due to the risk of vascular complications.\\n\\n**Cardiomegaly:**\\n- **Localization**: <loc_369_626_845_768> ![](overlay_bbox_Cardiomegaly.png)\\n- **Abnormal Region Segmentation**: ![](medsam_cardiomegaly_overlay.png)\\n- **Clinical Explanation**: The heart appears abnormally enlarged, with the cardiac silhouette occupying a large proportion of the thoracic cavity. The degree of cardiomegaly is assessed as moderate to severe. Further evaluation with echocardiography is recommended.\\n\\n**ILD:**\\n- **Localization**: <loc_114_186_453_742> ![](overlay_bbox_ILD.png)\\n- **Abnormal Region Segmentation**: ![](medsam_ild_overlay.png)\\n- **Clinical Explanation**: Diffuse reticular abnormalities are observed throughout both lungs with moderate to severe extent, suggestive of chronic interstitial lung disease. Further assessment with chest CT is recommended.\\n\\n**3. Conclusion:**\\nMultiple coexisting pathologies are identified, including aortic enlargement, cardiomegaly, and interstitial lung disease. Additional advanced investigations (CT imaging, echocardiography) are recommended for comprehensive evaluation and treatment planning."
+}}
 
-**Example 1: High confidence detection (with decimal coordinates)**
-Input bbox: [383.07, 482.61, 764.58, 600.87]
-<answer>Yes, cardiomegaly <loc_383_483_765_601> is present.</answer>
-<reason>
-1. Classification → Cardiomegaly: 0.85 (above 0.05 threshold)
-2. Detection → box [383.07,482.61,764.58,600.87] rounded to [383,483,765,601], score 0.96 ![](/logs/12/cardiomegaly.png)
-3. Explanation → "Heart enlarged, CTR 0.58"
-All evidence confirms cardiomegaly.
-</reason>
+**Example 2: Single disease**
+{{
+  "answer": "Detected Cardiomegaly <loc_383_483_765_601> on the chest X-ray.",
+  "reason": "**1. Initial Assessment:**\\nDetected cardiomegaly with a probability of 85%.\\n\\n**2. Detailed Analysis:**\\n\\n**Cardiomegaly:**\\n- **Localization**: <loc_383_483_765_601> ![](overlay_bbox_Cardiomegaly.png)\\n- **Abnormal Region Segmentation**: ![](medsam_cardiomegaly_overlay.png)\\n- **Clinical Explanation**: The heart is abnormally enlarged with a cardiothoracic ratio (CTR) of 0.58, exceeding the normal threshold (<0.5). Enlargement predominantly involves the left ventricle, suggesting underlying cardiovascular disease such as heart failure or valvular disease.\\n\\n**3. Conclusion:**\\nModerate to severe cardiomegaly is identified. Echocardiography is recommended to evaluate cardiac function and determine the underlying cause."
+}}
 
-**Example 2: Low detection score BUT still report bbox**
-<answer>Pleural effusion <loc_450_1200_850_1800> detected (classification: 0.78, detection score: 0.36).</answer>
-<reason>
-1. Classification → Pleural effusion: 0.78 (above 0.05 threshold)
-2. Detection → box [450,1200,850,1800], score 0.36 ![](/logs/15/effusion.png)
-3. Explanation → "No evidence of effusion"
-Classification + detection bbox present → report finding. Note: detection score is lower but bbox exists and must be reported.
-</reason>
+**Example 3: No disease detected**
+{{
+  "answer": "No abnormalities detected on the chest X-ray.",
+  "reason": "**1. Initial Assessment:**\\nNo significant abnormalities are identified on the chest radiograph.\\n\\n**2. Detailed Analysis:**\\nNo regions demonstrate pathological findings. All anatomical structures are within normal limits.\\n\\n**3. Conclusion:**\\nNormal chest X-ray."
+}}
 
-**Example 3: Detection failed**
-<answer>Classification suggests cardiomegaly (0.65), but localization unavailable due to detection failure.</answer>
-<reason>
-1. Segmentation → successful ![](/logs/xyz/overlay.png)
-2. Classification → Cardiomegaly: 0.65 (above 0.05 threshold)
-3. Detection → failed (no boxes returned)
-</reason>
-
-**Example 4: Classification below threshold**
-<answer>No nodule or mass detected.</answer>
-<reason>
-1. Classification → Nodule/Mass: 0.03 (below 0.05 threshold)
-2. Detection → no boxes
-3. Explanation → confirms negative
-All evidence indicates no nodule/mass.
-</reason>
+Respond ONLY with valid JSON. No other text or formatting.
+Answer in Vietnamese.
 '''

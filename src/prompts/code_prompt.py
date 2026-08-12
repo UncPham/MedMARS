@@ -8,6 +8,16 @@ CODER_PROMPT='''
 4. Always handle cases where methods return None or unexpected results
 5. ONLY output the execute_command function. Do not include any explanations, comments outside the function, additional text or ```python``` blocks
 
+**ERROR HANDLING & RETRY**:
+- If you receive PREVIOUS CODE (FAILED) and ERROR MESSAGE, carefully analyze the error
+- Common errors to fix:
+  * KeyError: Check if dict keys exist before accessing them
+  * AttributeError: Verify object has the method/attribute before calling
+  * TypeError: Check data types and conversions
+  * IndexError: Validate list/array indices before accessing
+- Fix the code based on the error message and regenerate the complete execute_command function
+- Do NOT just comment out failing code - actually fix the root cause
+
 **Provided Python Class:**
 
 class ImagePatch:
@@ -63,11 +73,11 @@ class ImagePatch:
         Returns:
             dict: {{
                 'detection': {{
-                    'boxes': array([[x1, y1, x2, y2], ...]),
-                    'scores': array([0.95, 0.82, ...]),
-                    'labels': array([0, 3, ...]),
-                    'label_names': ['Aortic enlargement', 'Cardiomegaly', ...],
-                    'overlay_paths': {{'Aortic enlargement': '/path/...', ...}}
+                    'boxes': List[List[float]] # array([[x1, y1, x2, y2], ...]),
+                    'scores':  List[float] # array([0.95, 0.82, ...]),
+                    'labels': List[int] # array([0, 3, ...]),
+                    'label_names': List[str] # per-bounding-box class names, same length as boxes
+                    'overlay_paths': Dict[str, str] # per-class merged overlay of all boxes {{'Aortic enlargement': '/path/...', ...}}
                 }},
                 'segmentations': [
                     {{
@@ -189,11 +199,11 @@ Step 1: best_image_match([image_path], ["Cardiomegaly"]) - Check cardiomegaly co
 Step 2: detect_chest_abnormality(image_path) - Grounding heart region with bbox
 Step 3: segment_lungs_heart(image_path) - get heart and lung masks
 Step 4: Check logic: if (has heart bbox and cardiomegaly conf > 0.05) → Step 5, else → return No
-Step 5: verify_property([original, detection overlays, anatomical segmentation overlay], "Evaluate if the heart is enlarged: calculate cardiothoracic ratio from segmentation masks, compare heart size to thorax width, reference normal CTR < 0.5, explain findings")
+Step 5: verify_property([original, detection overlays, anatomical segmentation overlay], "Evaluate if the heart is enlarged: calculate cardiothoracic ratio from segmentation masks, compare heart size to thorax width, reference normal, explain findings")
 Step 6: Return answer with:
-   - Direct answer: Yes/No (based on conf > 0.05 and has bbox and CTR assessment)
+   - Direct answer: Yes/No (based on conf > 0.05 and has bbox)
    - Raw outputs: best_image_match results {{"Cardiomegaly": confidence}}, detect_chest_abnormality (boxes, scores, label_names, overlay_paths, segmentations), segment_lungs_heart (overlay_path, H_mask_path, RL_mask_path, LL_mask_path)
-   - Clinical explanation: observed heart size → bbox location → CTR measurement → significance → conclusion
+   - Clinical explanation: observed heart size → bbox location → significance → conclusion
 
 A:
 def execute_command(image_path):
@@ -220,7 +230,7 @@ def execute_command(image_path):
     if is_cardiomegaly:
         verification_result = image_patch.verify_property(
             verify_property_images, 
-            "Analyze the heart size in this chest X-ray: 1) Calculate the cardiothoracic ratio (CTR) by measuring heart width and thorax width from the segmentation masks, 2) Compare the CTR to normal threshold (CTR < 0.5), 3) Describe the visual appearance of the heart borders and position, 4) Assess the degree of enlargement if present (mild/moderate/severe), 5) Identify which cardiac chambers appear enlarged based on the silhouette, 6) Provide clinical interpretation of the findings."
+            "Analyze the heart size in this chest X-ray: 1) Compare the CTR to normal, 2) Describe the visual appearance of the heart borders and position, 3) Assess the degree of enlargement if present (mild/moderate/severe), 4) Identify which cardiac chambers appear enlarged based on the silhouette, 5) Provide clinical interpretation of the findings."
         )
     else:
         verification_result = image_patch.verify_property(
