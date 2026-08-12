@@ -16,7 +16,7 @@ from src.medmars import MedMARS
 NUM_QUESTIONS_TO_TEST = None  # Set to None to test all questions, or a number (e.g., 50)
 
 # Option 2: Test questions in a range (START, END) - overrides NUM_QUESTIONS_TO_TEST if set
-QUESTION_RANGE = (0, 50)  # Set to None to use NUM_QUESTIONS_TO_TEST, or (start, end) like (20, 50)
+QUESTION_RANGE = (327, 350)  # Set to None to use NUM_QUESTIONS_TO_TEST, or (start, end) like (20, 50)
 
 JSON_PATH = "src/data/vindr_cxr_vqa/val_v1_clean.json"
 IMAGES_DIR = "src/data/vindr_cxr_vqa/images"

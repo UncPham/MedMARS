@@ -1,3 +1,46 @@
+"""
+DEIM Detection Evaluation Script
+
+This script evaluates DEIM model performance on chest X-ray pathology detection.
+
+Metrics Calculated:
+-------------------
+For each class and overall:
+
+1. Precision: TP / (TP + FP)
+   - Proportion of predicted boxes that are correct
+   - High precision = few false alarms
+
+2. Recall: TP / (TP + FN)
+   - Proportion of ground truth boxes that are detected
+   - High recall = few missed detections
+
+3. F1-Score: 2 * (Precision * Recall) / (Precision + Recall)
+   - Harmonic mean of precision and recall
+   - Balances both metrics
+
+4. Mean IoU on True Positives (mIoU):
+   - Average Intersection over Union for correctly matched predictions
+   - Measures localization accuracy of true positives
+   - Higher = better bounding box alignment
+
+Aggregation Methods:
+--------------------
+- Micro-averaging: Aggregate counts first (TP, FP, FN), then compute metrics
+  - Gives equal weight to each prediction/GT box
+  - Dominated by frequent classes
+
+- Macro-averaging: Compute metrics per class, then average
+  - Gives equal weight to each class
+  - Treats rare and common diseases equally
+
+Matching Strategy:
+------------------
+- Predictions matched to GT using IoU threshold (default 0.3)
+- One-to-one matching: each prediction matches at most one GT
+- Best match selected based on highest IoU
+"""
+
 import os
 import sys
 import json
@@ -187,30 +230,40 @@ def calculate_metrics_per_class(all_predictions: List[Dict],
                 })
 
     num_gt = len(class_gts)
+    num_pred = len(class_predictions)
 
     if num_gt == 0:
         return {
             'detection_rate': 0.0,
             'recall': 0.0,
+            'precision': 0.0,
+            'f1': 0.0,
+            'mean_iou': 0.0,
             'num_gt': 0,
-            'num_pred': len(class_predictions),
+            'num_pred': num_pred,
             'tp': 0,
+            'fp': num_pred,
             'fn': 0
         }
 
-    if len(class_predictions) == 0:
+    if num_pred == 0:
         return {
             'detection_rate': 0.0,
             'recall': 0.0,
+            'precision': 0.0,
+            'f1': 0.0,
+            'mean_iou': 0.0,
             'num_gt': num_gt,
             'num_pred': 0,
             'tp': 0,
+            'fp': 0,
             'fn': num_gt
         }
 
-    # For each GT, find if there's ANY matching prediction
-    # We DON'T care about false positives
+    # Match predictions to GTs
     matched_gts = set()
+    matched_preds = set()
+    tp_ious = []  # Store IoU values for TP matches
 
     for gt_idx, gt in enumerate(class_gts):
         best_iou = 0.0
@@ -218,6 +271,10 @@ def calculate_metrics_per_class(all_predictions: List[Dict],
 
         # Find best matching prediction for this GT
         for pred_idx, pred in enumerate(class_predictions):
+            # Skip if prediction already matched
+            if pred_idx in matched_preds:
+                continue
+
             if gt['image_id'] != pred['image_id']:
                 continue
 
@@ -228,18 +285,39 @@ def calculate_metrics_per_class(all_predictions: List[Dict],
 
         if best_pred_idx >= 0:
             matched_gts.add(gt_idx)
+            matched_preds.add(best_pred_idx)
+            tp_ious.append(best_iou)
 
-    # Calculate detection rate
+    # Calculate metrics
     tp = len(matched_gts)
+    fp = num_pred - len(matched_preds)
     fn = num_gt - tp
-    detection_rate = tp / num_gt
+
+    # Precision: TP / (TP + FP)
+    precision = tp / num_pred if num_pred > 0 else 0.0
+
+    # Recall: TP / (TP + FN) = TP / num_gt
+    recall = tp / num_gt if num_gt > 0 else 0.0
+
+    # F1-Score: 2 * (Precision * Recall) / (Precision + Recall)
+    if precision + recall > 0:
+        f1 = 2 * (precision * recall) / (precision + recall)
+    else:
+        f1 = 0.0
+
+    # Mean IoU on True Positives
+    mean_iou = np.mean(tp_ious) if len(tp_ious) > 0 else 0.0
 
     return {
-        'detection_rate': detection_rate,
-        'recall': detection_rate,  # Same as detection rate
+        'detection_rate': recall,  # Same as recall
+        'recall': recall,
+        'precision': precision,
+        'f1': f1,
+        'mean_iou': mean_iou,
         'num_gt': num_gt,
-        'num_pred': len(class_predictions),
+        'num_pred': num_pred,
         'tp': tp,
+        'fp': fp,
         'fn': fn
     }
 
@@ -467,8 +545,8 @@ def test_deim_detection():
 
     logger.info(f"Found {len(all_classes)} classes: {sorted(all_classes)}")
 
+    # Calculate metrics for each class
     for class_name in sorted(all_classes):
-        logger.info(f"\nCalculating metrics for class: {class_name}")
         metrics = calculate_metrics_per_class(
             all_predictions,
             all_ground_truths,
@@ -476,26 +554,84 @@ def test_deim_detection():
             IOU_THRESHOLD
         )
         per_class_metrics[class_name] = metrics
-        logger.info(f"  Detection Rate: {metrics['detection_rate']:.4f} ({metrics['tp']}/{metrics['num_gt']})")
-        logger.info(f"  GT boxes: {metrics['num_gt']}, Predictions: {metrics['num_pred']}")
-        logger.info(f"  True Positives: {metrics['tp']}, False Negatives: {metrics['fn']}")
+
+    # Print detailed per-class metrics in table format
+    logger.info("\n" + "="*100)
+    logger.info("PER-CLASS METRICS")
+    logger.info("="*100)
+    logger.info(f"{'Class':<25} {'GT':<6} {'Pred':<6} {'TP':<6} {'FP':<6} {'FN':<6} {'Prec':<8} {'Rec':<8} {'F1':<8} {'mIoU':<8}")
+    logger.info("-"*100)
+
+    for class_name in sorted(all_classes):
+        metrics = per_class_metrics[class_name]
+        logger.info(
+            f"{class_name:<25} "
+            f"{metrics['num_gt']:<6} "
+            f"{metrics['num_pred']:<6} "
+            f"{metrics['tp']:<6} "
+            f"{metrics['fp']:<6} "
+            f"{metrics['fn']:<6} "
+            f"{metrics['precision']:<8.4f} "
+            f"{metrics['recall']:<8.4f} "
+            f"{metrics['f1']:<8.4f} "
+            f"{metrics['mean_iou']:<8.4f}"
+        )
+
+    logger.info("-"*100)
 
     # Calculate overall metrics
     logger.info("\n" + "="*80)
-    logger.info("OVERALL METRICS (Recall-Only Mode)")
+    logger.info("OVERALL METRICS")
     logger.info("="*80)
-    logger.info("NOTE: This evaluation ignores false positives.")
-    logger.info("Only measures if GT findings are detected (appropriate for incomplete GT).")
 
-    mean_detection_rate = np.mean([m['detection_rate'] for m in per_class_metrics.values()])
+    # Aggregate metrics across all classes
     total_tp = sum([m['tp'] for m in per_class_metrics.values()])
-    total_gt = sum([m['num_gt'] for m in per_class_metrics.values()])
+    total_fp = sum([m['fp'] for m in per_class_metrics.values()])
     total_fn = sum([m['fn'] for m in per_class_metrics.values()])
+    total_gt = sum([m['num_gt'] for m in per_class_metrics.values()])
+    total_pred = sum([m['num_pred'] for m in per_class_metrics.values()])
 
-    logger.info(f"Mean Detection Rate: {mean_detection_rate:.4f}")
-    logger.info(f"Total: {total_tp}/{total_gt} GT findings detected")
-    logger.info(f"Total True Positives: {total_tp}")
-    logger.info(f"Total False Negatives: {total_fn}")
+    # Calculate micro-averaged metrics (aggregate then compute)
+    micro_precision = total_tp / total_pred if total_pred > 0 else 0.0
+    micro_recall = total_tp / total_gt if total_gt > 0 else 0.0
+
+    if micro_precision + micro_recall > 0:
+        micro_f1 = 2 * (micro_precision * micro_recall) / (micro_precision + micro_recall)
+    else:
+        micro_f1 = 0.0
+
+    # Calculate macro-averaged metrics (compute then average)
+    valid_metrics = [m for m in per_class_metrics.values() if m['num_gt'] > 0]
+    macro_precision = np.mean([m['precision'] for m in valid_metrics]) if valid_metrics else 0.0
+    macro_recall = np.mean([m['recall'] for m in valid_metrics]) if valid_metrics else 0.0
+    macro_f1 = np.mean([m['f1'] for m in valid_metrics]) if valid_metrics else 0.0
+
+    # Calculate overall mean IoU (on all TP matches)
+    all_tp_ious = []
+    for m in per_class_metrics.values():
+        if m['mean_iou'] > 0:  # Only include classes that have TP matches
+            # Weight by number of TPs for proper averaging
+            all_tp_ious.extend([m['mean_iou']] * m['tp'])
+    overall_mean_iou = np.mean(all_tp_ious) if len(all_tp_ious) > 0 else 0.0
+
+    logger.info(f"\nMicro-averaged metrics (aggregate then compute):")
+    logger.info(f"  Precision: {micro_precision:.4f} (TP={total_tp}, FP={total_fp})")
+    logger.info(f"  Recall: {micro_recall:.4f} (TP={total_tp}, FN={total_fn})")
+    logger.info(f"  F1-Score: {micro_f1:.4f}")
+
+    logger.info(f"\nMacro-averaged metrics (compute then average):")
+    logger.info(f"  Precision: {macro_precision:.4f}")
+    logger.info(f"  Recall: {macro_recall:.4f}")
+    logger.info(f"  F1-Score: {macro_f1:.4f}")
+
+    logger.info(f"\nMean IoU on True Positives: {overall_mean_iou:.4f}")
+
+    logger.info(f"\nAggregate counts:")
+    logger.info(f"  Total GT boxes: {total_gt}")
+    logger.info(f"  Total Predictions: {total_pred}")
+    logger.info(f"  Total TP: {total_tp}")
+    logger.info(f"  Total FP: {total_fp}")
+    logger.info(f"  Total FN: {total_fn}")
 
     # Save results
     results_file = os.path.join(OUTPUT_DIR, "evaluation_results.json")
@@ -504,17 +640,28 @@ def test_deim_detection():
             'conf_threshold': CONF_THRESHOLD,
             'iou_threshold': IOU_THRESHOLD,
             'num_images': len(image_ids),
-            'num_classes': len(all_classes),
-            'evaluation_mode': 'recall_only',
-            'note': 'False positives are ignored. Only GT detection rate is measured.'
+            'num_classes': len(all_classes)
         },
         'per_class_metrics': per_class_metrics,
         'overall_metrics': {
-            'mean_detection_rate': mean_detection_rate,
-            'total_gt': total_gt,
-            'total_tp': total_tp,
-            'total_fn': total_fn,
-            'overall_detection_rate': total_tp / total_gt if total_gt > 0 else 0.0
+            'micro': {
+                'precision': float(micro_precision),
+                'recall': float(micro_recall),
+                'f1': float(micro_f1)
+            },
+            'macro': {
+                'precision': float(macro_precision),
+                'recall': float(macro_recall),
+                'f1': float(macro_f1)
+            },
+            'mean_iou_on_tp': float(overall_mean_iou),
+            'counts': {
+                'total_gt': total_gt,
+                'total_pred': total_pred,
+                'total_tp': total_tp,
+                'total_fp': total_fp,
+                'total_fn': total_fn
+            }
         },
         'detailed_results': image_results
     }
