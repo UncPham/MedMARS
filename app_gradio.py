@@ -1,9 +1,9 @@
 """
 MedMARS Gradio Interface
 ========================
-Giao diện web đơn giản để sử dụng MedMARS - Medical Multi-modal Agent with Reasoning and Search
+Simple web interface for MedMARS - Medical Multi-modal Agent with Reasoning and Search
 
-Sử dụng:
+Usage:
     python app_gradio.py
 """
 
@@ -21,9 +21,9 @@ from src.image_patch import ImagePatch
 
 
 # Initialize MedMARS
-print("Đang khởi tạo MedMARS...")
+print("Initializing MedMARS...")
 medmars = MedMARS()
-print("MedMARS đã sẵn sàng!")
+print("MedMARS is ready!")
 
 
 # Global state to store intermediate results
@@ -42,10 +42,10 @@ state = SessionState()
 
 def convert_to_serializable(obj):
     """
-    Convert object thành JSON-serializable format
+    Convert an object into a JSON-serializable format
 
     Args:
-        obj: Object cần convert (có thể là numpy array, dict, list, etc.)
+        obj: Object to convert (may be a numpy array, dict, list, etc.)
 
     Returns:
         JSON-serializable object
@@ -68,38 +68,38 @@ def convert_to_serializable(obj):
 
 def format_output_as_json(output):
     """
-    Format output thành JSON đẹp
+    Pretty-print the output as JSON
 
     Args:
-        output: Output từ code execution
+        output: Output from the code execution
 
     Returns:
-        Formatted string (JSON format đẹp)
+        Formatted string (pretty JSON)
     """
     try:
-        # Convert thành JSON-serializable object
+        # Convert to a JSON-serializable object
         serializable = convert_to_serializable(output)
 
-        # Format thành JSON đẹp với indent
+        # Pretty-print with indentation
         formatted = json.dumps(serializable, indent=2, ensure_ascii=False)
 
         return formatted
 
     except Exception:
-        # Nếu không thể format thành JSON, dùng pprint
+        # Fall back to pprint when the output cannot be JSON-encoded
         try:
             import pprint
             return pprint.pformat(output, indent=2, width=80)
         except Exception:
-            # Fallback cuối cùng: return string
+            # Last resort: return the raw string
             return str(output)
 
 
 def step1_planning(image, question):
     """
-    STEP 1: Planning - Tương đương với phần planner trong medmars.run()
+    STEP 1: Planning - equivalent to the planner stage in medmars.run()
 
-    Tương ứng với code trong medmars.run():
+    Mirrors this code in medmars.run():
         self.thought, self.plan = self.planner(query=query, image_path=image_path)
     """
     print("\n" + "="*60)
@@ -107,10 +107,10 @@ def step1_planning(image, question):
     print("="*60)
 
     if image is None:
-        return "❌ Lỗi: Không có ảnh", "", "", ""
+        return "❌ Error: no image provided", "", "", ""
 
     if not question or question.strip() == "":
-        return "❌ Lỗi: Không có câu hỏi", "", "", ""
+        return "❌ Error: no question provided", "", "", ""
 
     try:
         # Create temporary output directory
@@ -122,8 +122,8 @@ def step1_planning(image, question):
         image.save(str(temp_image_path))
         state.image_path = str(temp_image_path)
 
-        print(f"📝 Câu hỏi: {question}")
-        print(f"🖼️  Ảnh đã lưu tại: {state.image_path}")
+        print(f"📝 Question: {question}")
+        print(f"🖼️  Image saved to: {state.image_path}")
 
         # Call planner - same as medmars.run()
         state.thought, state.plan = medmars.planner(query=question, image_path=state.image_path)
@@ -131,20 +131,20 @@ def step1_planning(image, question):
         print(f"💭 Thought: {state.thought[:100]}...")
         print(f"📋 Plan: {state.plan[:100]}...")
 
-        return "✅ Bước 1: Đã hoàn thành Planning", state.thought, state.plan, ""
+        return "✅ Step 1: Planning complete", state.thought, state.plan, ""
 
     except Exception as e:
-        print(f"❌ Lỗi ở STEP 1: {str(e)}")
+        print(f"❌ Error in STEP 1: {str(e)}")
         import traceback
         traceback.print_exc()
-        return f"❌ Lỗi: {str(e)}", "", "", ""
+        return f"❌ Error: {str(e)}", "", "", ""
 
 
 def step2_code_generation():
     """
-    STEP 2: Code Generation - Tương đương với phần code_generator trong medmars.run()
+    STEP 2: Code Generation - equivalent to the code_generator stage in medmars.run()
 
-    Tương ứng với code trong medmars.run():
+    Mirrors this code in medmars.run():
         self.code = self.code_generator(self.plan)
     """
     print("\n" + "="*60)
@@ -152,7 +152,7 @@ def step2_code_generation():
     print("="*60)
 
     if not state.plan:
-        return "❌ Lỗi: Chưa có plan", "", ""
+        return "❌ Error: no plan available yet", "", ""
 
     try:
         # Call code_generator - same as medmars.run()
@@ -162,53 +162,64 @@ def step2_code_generation():
         print("Code preview:")
         print(state.code[:200] + "...")
 
-        return "✅ Bước 2: Đã sinh code", state.code, ""
+        return "✅ Step 2: Code generated", state.code, ""
 
     except Exception as e:
-        print(f"❌ Lỗi ở STEP 2: {str(e)}")
+        print(f"❌ Error in STEP 2: {str(e)}")
         import traceback
         traceback.print_exc()
-        return f"❌ Lỗi: {str(e)}", "", ""
+        return f"❌ Error: {str(e)}", "", ""
 
 
-def step3_execution():
+def step3_execution(max_retries=2):
     """
-    STEP 3: Code Execution - Tương đương với phần execution trong medmars.run()
+    STEP 3: Code Execution with a retry mechanism
 
-    Tương ứng với code trong medmars.run():
-        exec_globals = globals().copy()
-        if output_dir:
-            exec_globals['ImagePatch'] = lambda outputs_dir=output_dir: ImagePatch(outputs_dir=outputs_dir)
-        else:
-            exec_globals['ImagePatch'] = ImagePatch
-        exec(self.code, exec_globals)
-        execute_command = exec_globals.get('execute_command')
-        out = execute_command(image_path)
+    Mirrors medmars.run() but retries when the generated code raises
     """
     print("\n" + "="*60)
     print("STEP 3: CODE EXECUTION")
     print("="*60)
 
     if not state.code:
-        return "❌ Lỗi: Chưa có code", "", ""
+        return "❌ Error: no code available yet", "", ""
 
     if not state.image_path:
-        return "❌ Lỗi: Không có ảnh", "", ""
+        return "❌ Error: no image provided", "", ""
 
-    try:
-        # Execute code - EXACTLY same logic as medmars.run()
-        exec_globals = globals().copy()
+    out = None
+    state.result = None
+    error_message = None
 
-        # Create ImagePatch factory with output_dir if specified
-        if state.output_dir:
-            exec_globals['ImagePatch'] = lambda outputs_dir=str(state.output_dir): ImagePatch(outputs_dir=outputs_dir)
-        else:
-            exec_globals['ImagePatch'] = ImagePatch
-
-        exec(state.code, exec_globals)
-        state.result = None
-
+    # Retry loop
+    for retry_attempt in range(max_retries + 1):
         try:
+            # If this is a retry, regenerate code with error feedback
+            if retry_attempt > 0:
+                print(f"\n{'='*60}")
+                print(f"⚠️  Code execution failed. Retrying ({retry_attempt}/{max_retries})...")
+                print(f"{'='*60}")
+
+                # Send error + old code back to coder for fixing
+                retry_prompt = f"{state.plan}\n\n--- PREVIOUS CODE (FAILED) ---\n```python\n{state.code}\n```\n\n--- ERROR MESSAGE ---\n{error_message}\n\n--- INSTRUCTIONS ---\nThe code above failed with the error shown. Please analyze the error and fix the code. Common issues:\n- KeyError: Check if dict keys exist before accessing\n- AttributeError: Verify object has the method/attribute\n- TypeError: Check data types\n- IndexError: Validate indices\n\nRegenerate the complete execute_command function with the fix."
+
+                print(f"\n🔄 Regenerating code with error feedback...")
+                state.code = medmars.code_generator(retry_prompt)
+                print(f"💻 Code (Attempt {retry_attempt + 1}):")
+                print(state.code[:200] + "...")
+
+            # Execute code - EXACTLY same logic as medmars.run()
+            print(f"\n⚙️ Executing code (attempt {retry_attempt + 1})...")
+            exec_globals = globals().copy()
+
+            # Create ImagePatch factory with output_dir if specified
+            if state.output_dir:
+                exec_globals['ImagePatch'] = lambda outputs_dir=str(state.output_dir): ImagePatch(outputs_dir=outputs_dir)
+            else:
+                exec_globals['ImagePatch'] = ImagePatch
+
+            exec(state.code, exec_globals)
+
             execute_command = exec_globals.get('execute_command')
             if execute_command is None:
                 raise ValueError("execute_command function not found in generated code")
@@ -220,43 +231,67 @@ def step3_execution():
             # Format output as JSON if possible
             output_text = format_output_as_json(out)
 
+            print(f"✅ Code executed successfully on attempt {retry_attempt + 1}!")
             print(f"✅ Execution result: {output_text[:200]}...")
 
+            return f"✅ Step 3: Code executed (attempt {retry_attempt + 1})", output_text, state.code
+
         except Exception as e:
-            out = str(e)
-            state.execution_output = out
-            state.result = None
-            output_text = str(e)
-            print(f"❌ Execution error: {out}")
+            error_message = str(e)
+            print(f"❌ Error on attempt {retry_attempt + 1}: {error_message}")
 
-        return "✅ Bước 3: Đã thực thi code", output_text, ""
+            # If this was the last attempt, return error
+            if retry_attempt == max_retries:
+                state.execution_output = error_message
+                state.result = None
+                print(f"\n{'='*60}")
+                print(f"❌ Code execution failed after {max_retries + 1} attempts.")
+                print(f"{'='*60}\n")
 
-    except Exception as e:
-        print(f"❌ Lỗi ở STEP 3: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return f"❌ Lỗi: {str(e)}", "", ""
+                import traceback
+                traceback.print_exc()
+
+                return f"❌ Error after {max_retries + 1} attempts: {error_message}", str(e), state.code
 
 
 def enrich_explanation_with_images(explanation, overlay_images):
     """
-    Thay thế relative image paths trong explanation bằng base64 embedded images
-    để Gradio có thể hiển thị
+    Replace relative image paths in the explanation with base64-embedded images
+    and escape <loc_...> tags so Gradio Markdown renders them
 
     Args:
-        explanation: Explanation text từ reporter (có thể chứa markdown images)
-        overlay_images: List các đường dẫn overlay images
+        explanation: Explanation text from the reporter (may contain markdown images and <loc_...> tags)
+        overlay_images: List of overlay image paths
 
     Returns:
-        Markdown text với base64 embedded images
+        Markdown text with base64-embedded images and escaped location tags
     """
-    if not overlay_images:
-        return explanation
-
     import base64
     import re
 
-    # Tạo mapping từ tên file -> base64 data URL
+    # Step 1: Escape <loc_...> tags so Markdown does not strip them
+    # Convert <loc_x1_y1_x2_y2> to styled inline code
+    def escape_loc_tags(text):
+        # Pattern to match <loc_x1_y1_x2_y2> tags
+        loc_pattern = r'<loc_(\d+_\d+_\d+_\d+)>'
+        # Replace with styled code block that looks like a tag
+        def replace_loc(match):
+            coords = match.group(1)
+            # Use inline code with special styling to make it look like a tag
+            return f'`<loc_{coords}>`'
+
+        escaped = re.sub(loc_pattern, replace_loc, text)
+        return escaped
+
+    # Apply escaping first
+    explanation = escape_loc_tags(explanation)
+    print("✅ Escaped location tags in explanation")
+
+    # Step 2: Embed images
+    if not overlay_images:
+        return explanation
+
+    # Build a mapping of filename -> base64 data URL
     image_map = {}
     for img_path in overlay_images:
         try:
@@ -267,33 +302,33 @@ def enrich_explanation_with_images(explanation, overlay_images):
                 image_map[img_name] = f"data:image/png;base64,{img_base64}"
             print(f"✅ Loaded image for embedding: {img_name}")
         except Exception as e:
-            print(f"⚠️  Warning: Không thể load ảnh {img_path}: {e}")
+            print(f"⚠️  Warning: could not load image {img_path}: {e}")
             continue
 
-    # Tìm và thay thế tất cả markdown images: ![](filename.png) hoặc ![alt](filename.png)
+    # Find and replace every markdown image: ![](filename.png) or ![alt](filename.png)
     def replace_image_path(match):
-        alt_text = match.group(1)  # Alt text (có thể rỗng)
-        filename = match.group(2)  # Tên file
-        
+        alt_text = match.group(1)  # Alt text (may be empty)
+        filename = match.group(2)  # File name
+
         print(f"🔎 Matching image: alt=[{alt_text}], filename=[{filename}]")
-        
-        # Nếu alt text chính là filename, thì lấy tên file làm display name
+
+        # If the alt text is just the filename, derive a display name instead
         if alt_text == filename:
             alt_text = ""
-        
+
         if filename in image_map:
             data_url = image_map[filename]
-            # Sử dụng HTML img tag thay vì markdown để có thể style
+            # Use an HTML img tag instead of markdown so it can be styled
             display_name = alt_text if alt_text else filename.replace("overlay_", "").replace("segmentation_", "").replace(".png", "").replace("_", " ").title()
             print(f"✅ Replaced with embedded image: {display_name}")
             return f'<img src="{data_url}" alt="{display_name}" style="max-width: 100%; height: auto; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; padding: 5px;" />'
         else:
-            # Giữ nguyên nếu không tìm thấy
-            print(f"⚠️  Warning: Không tìm thấy ảnh {filename} trong overlay_images")
+            # Leave the reference untouched when the image is missing
+            print(f"⚠️  Warning: image {filename} not found in overlay_images")
             return match.group(0)
 
-    # Regex pattern để match markdown images
-    # Sử dụng finditer để match tất cả occurrences, kể cả khi ảnh nằm liền nhau
+    # Regex pattern matching markdown images
+    # Matches every occurrence, including back-to-back images
     pattern = r'!\[([^\]]*)\]\(([^)]+\.png)\)'
     enriched_explanation = re.sub(pattern, replace_image_path, explanation)
 
@@ -304,9 +339,9 @@ def enrich_explanation_with_images(explanation, overlay_images):
 
 def step4_generate_answer(question):
     """
-    STEP 4: Generate Answer - Tương đương với phần reporter trong medmars.run()
+    STEP 4: Generate Answer - equivalent to the reporter stage in medmars.run()
 
-    Tương ứng với code trong medmars.run():
+    Mirrors this code in medmars.run():
         response = self.reporter(query, out, self.code) if out else {
             "answer": "Error in execution",
             "explanation": str(result),
@@ -317,7 +352,7 @@ def step4_generate_answer(question):
     print("="*60)
 
     if not state.execution_output:
-        return "❌ Lỗi: Chưa có execution output", "", "", ""
+        return "❌ Error: no execution output available yet", "", "", ""
 
     try:
         # Call reporter - same as medmars.run()
@@ -329,8 +364,8 @@ def step4_generate_answer(question):
         answer = response.get('answer', 'No answer generated')
         explanation = response.get('explanation') or response.get('reason', 'No explanation available')
 
-        # Collect ALL PNG images trong output_dir để nhúng vào explanation
-        # (bao gồm cả overlay_*.png, segmentation_*.png, etc.)
+        # Collect ALL PNG images in output_dir to embed into the explanation
+        # (includes overlay_*.png, segmentation_*.png, etc.)
         overlay_images = []
         if state.output_dir and state.output_dir.exists():
             for img_file in sorted(state.output_dir.glob("*.png")):
@@ -345,7 +380,7 @@ def step4_generate_answer(question):
         print(f"\n📄 Original explanation preview:")
         print(explanation[:500])
         
-        # Enrich explanation với embedded images
+        # Enrich the explanation with embedded images
         explanation_with_images = enrich_explanation_with_images(explanation, overlay_images)
         
         # Debug: Check if replacement happened
@@ -356,13 +391,13 @@ def step4_generate_answer(question):
         print(f"📝 Explanation: {explanation}")
         print(f"🖼️  Embedded {len(overlay_images)} images in explanation")
 
-        return "✅ Bước 4: Đã tạo câu trả lời", answer, explanation_with_images, ""
+        return "✅ Step 4: Answer generated", answer, explanation_with_images, ""
 
     except Exception as e:
-        print(f"❌ Lỗi ở STEP 4: {str(e)}")
+        print(f"❌ Error in STEP 4: {str(e)}")
         import traceback
         traceback.print_exc()
-        return f"❌ Lỗi: {str(e)}", "", "", ""
+        return f"❌ Error: {str(e)}", "", "", ""
 
 
 def step5_collect_images():
@@ -383,24 +418,24 @@ def step5_collect_images():
                     overlay_images.append(str(img_file))
                     print(f"🖼️  Found image: {img_file.name}")
 
-        print(f"✅ Tìm thấy {len(overlay_images)} images")
+        print(f"✅ Found {len(overlay_images)} images")
         print("="*60)
-        print("✅ HOÀN THÀNH TẤT CẢ CÁC BƯỚC!")
+        print("✅ ALL STEPS COMPLETED!")
         print("="*60 + "\n")
 
-        return "✅ Hoàn thành tất cả!", overlay_images
+        return "✅ All steps completed!", overlay_images
 
     except Exception as e:
-        print(f"❌ Lỗi ở STEP 5: {str(e)}")
+        print(f"❌ Error in STEP 5: {str(e)}")
         import traceback
         traceback.print_exc()
-        return f"❌ Lỗi: {str(e)}", []
+        return f"❌ Error: {str(e)}", []
 
 
 def run_full_pipeline(image, question):
     """
-    Chạy toàn bộ pipeline - chain tất cả các steps lại với nhau
-    Tương đương với medmars.run() nhưng yield từng bước
+    Run the whole pipeline - chain all steps together
+    Equivalent to medmars.run() but yields after each step
     """
     # Step 1: Planning
     status1, thought, plan, _ = step1_planning(image, question)
@@ -436,7 +471,7 @@ def run_full_pipeline(image, question):
 
 
 def create_demo():
-    """Tạo Gradio interface"""
+    """Build the Gradio interface"""
 
     with gr.Blocks(title="MedMARS - Medical VQA Assistant") as demo:
         gr.Markdown(
@@ -445,13 +480,13 @@ def create_demo():
 
             **Medical Multi-modal Agent with Reasoning and Search**
 
-            Hệ thống AI phân tích ảnh X-quang ngực và trả lời câu hỏi y khoa.
+            An AI system that analyzes chest X-rays and answers clinical questions.
 
-            ## 🔄 Quy trình xử lý (4 bước)
-            1. 🧠 **Planning** - Phân tích câu hỏi và tạo kế hoạch
-            2. 💻 **Code Generation** - Sinh code thực thi
-            3. ⚙️ **Execution** - Chạy code và lấy kết quả
-            4. 💬 **Generate Answer** - Tạo câu trả lời
+            ## 🔄 Pipeline (4 steps)
+            1. 🧠 **Planning** - Analyze the question and draft a plan
+            2. 💻 **Code Generation** - Generate the code to execute
+            3. ⚙️ **Execution** - Run the code and collect results
+            4. 💬 **Generate Answer** - Produce the final answer
             """
         )
 
@@ -462,32 +497,32 @@ def create_demo():
 
                 image_input = gr.Image(
                     type="pil",
-                    label="Upload ảnh X-quang ngực",
+                    label="Upload chest X-ray",
                     height=400
                 )
 
                 question_input = gr.Textbox(
-                    label="Câu hỏi",
-                    placeholder="Ví dụ: What abnormalities are present in this chest X-ray?",
+                    label="Question",
+                    placeholder="Example: What abnormalities are present in this chest X-ray?",
                     lines=3
                 )
 
                 with gr.Row():
-                    run_all_btn = gr.Button("🚀 Chạy toàn bộ", variant="primary", size="lg")
+                    run_all_btn = gr.Button("🚀 Run full pipeline", variant="primary", size="lg")
                     gr.ClearButton(
                         components=[image_input, question_input],
-                        value="🗑️ Xóa"
+                        value="🗑️ Clear"
                     )
 
                 gr.Markdown("""
-                    **💡 Cách sử dụng:**
-                    - Upload ảnh X-quang
-                    - Nhập câu hỏi
-                    - Nhấn "🚀 Chạy toàn bộ" để xem kết quả từng bước
+                    **💡 How to use:**
+                    - Upload a chest X-ray
+                    - Type your question
+                    - Press "🚀 Run full pipeline" to see the result of each step
                 """)
 
                 # Examples
-                gr.Markdown("### 💡 Ví dụ")
+                gr.Markdown("### 💡 Examples")
                 gr.Examples(
                     examples=[
                         [
@@ -509,18 +544,18 @@ def create_demo():
 
             # Right column: Output
             with gr.Column(scale=1):
-                gr.Markdown("### 📊 Kết quả")
+                gr.Markdown("### 📊 Results")
 
                 # Status indicator
                 status_output = gr.Textbox(
-                    label="⏳ Trạng thái",
-                    value="Chưa bắt đầu",
+                    label="⏳ Status",
+                    value="Not started",
                     lines=1,
                     interactive=False
                 )
 
                 # Thought (collapsible)
-                with gr.Accordion("💭 Thought (Suy nghĩ)", open=False):
+                with gr.Accordion("💭 Thought", open=False):
                     thought_output = gr.Textbox(
                         label="",
                         lines=5,
@@ -529,7 +564,7 @@ def create_demo():
 
                 # Plan
                 plan_output = gr.Textbox(
-                    label="📋 Plan (Kế hoạch)",
+                    label="📋 Plan",
                     lines=5
                 )
 
@@ -552,18 +587,18 @@ def create_demo():
 
                 # Answer
                 answer_output = gr.Textbox(
-                    label="💬 Câu trả lời",
+                    label="💬 Answer",
                     lines=3
                 )
 
                 # Explanation (Markdown format)
                 explanation_output = gr.Markdown(
-                    label="📝 Giải thích chi tiết"
+                    label="📝 Detailed explanation"
                 )
 
                 # Gallery
                 gallery_output = gr.Gallery(
-                    label="🖼️ Hình ảnh phát hiện bệnh",
+                    label="🖼️ Detected abnormality images",
                     columns=3,
                     height=300,
                     object_fit="contain"
@@ -599,10 +634,10 @@ if __name__ == "__main__":
     print("\n" + "="*60)
     print("🚀 Launching MedMARS Gradio Interface...")
     print("="*60)
-    print("\n📍 Truy cập app tại:")
+    print("\n📍 Access the app at:")
     print("   - Local: http://localhost:7860")
     print("   - Network: http://0.0.0.0:7860")
-    print("\n⚠️  Nhấn Ctrl+C để dừng server\n")
+    print("\n⚠️  Press Ctrl+C to stop the server\n")
 
     demo.launch(
         server_name="0.0.0.0",
